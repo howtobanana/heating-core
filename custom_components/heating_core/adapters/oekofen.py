@@ -76,8 +76,12 @@ class OekofenAdapter:
         current = self._num(f"sensor.{circuit_base(master_entity)}_l_roomtemp_act")
         if current is None:
             current = _float(st.attributes.get("current_temperature"))
-        # climate „off“ = Pellematic hat den Kreis abgeschaltet (Heizgrenze, Aus) -> nicht übersteuern
-        return CircuitState(setpoint, current, setpoint is not None, heating_off=st.state == "off")
+        # climate „off“ = Pellematic hat den Kreis abgeschaltet (Heizgrenze, Aus) -> nicht übersteuern.
+        # Steuert Heating Core (heizen/absenken), kann das „aus“ von der eigenen Absenkung kommen
+        # (Heizgrenze der Absenkphase) – dann darf es das Zurückschreiben nicht sperren.
+        mode = (self.hass.states.get(ids["mode"]) or _NONE).state
+        return CircuitState(setpoint, current, setpoint is not None,
+                            heating_off=st.state == "off" and mode not in (MODE_HEAT, MODE_SETBACK))
 
     def needs_takeover(self, master_entity: str) -> bool:
         """Läuft der Kreis noch im eigenen Zeitprogramm (auto), obwohl Heating Core steuern soll?"""

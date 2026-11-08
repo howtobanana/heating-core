@@ -8,7 +8,7 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/howtobanana/heating-core/issues",
   "requirements": [],
-  "version": "0.6.2",
+  "version": "0.6.3",
   "after_dependencies": [
     "frontend",
     "http",

@@ -156,7 +156,7 @@ def _hk1_entry(schedule=None) -> MockConfigEntry:
         data["schedule"] = schedule
     return MockConfigEntry(
         domain=DOMAIN, title="P", unique_id="p", data={"name": "P", "manufacturer": "oekofen"},
-        options={"eco_temp": 19.0, "presence_activation_min": 0},
+        options={"eco_temp": 19.0, "presence_activation_min": 0, "boost_enabled": False},
         subentries_data=[
             ConfigSubentryData(data=data, subentry_id="hk1", subentry_type="circuit", title="HK1", unique_id=None),
             ConfigSubentryData(data={"circuit": "hk1", "role": "isolated", "climate": "climate.trv", "comfort": 21.0},
@@ -210,3 +210,24 @@ async def test_raum_erbt_zeitplan_und_absenkung_vom_kreis(hass: HomeAssistant) -
     hass.states.async_set("schedule.hk1", "on")
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["rooms"]["buero"]["mode"] == "schedule"
+
+
+async def test_eigene_absenkung_sperrt_rueckweg_nicht(hass: HomeAssistant) -> None:
+    """Perg 08.11.2026 21:21: Abwesend kurz an -> absenken −3 -> Pellematic „aus“ (Heizgrenze).
+    Danach muss Heating Core wieder auf Komfort zurückschreiben, statt „Kreis aus“ zu melden."""
+    _hk1_states(hass, mode="3_absenken", text="Absenkbetrieb aktiv|Außentemp über Heizgrenze absenken")
+    hass.states.async_set(f"number.{HK1_B}_remote_override", "-3")
+    hass.states.async_set(HK1, "off", {"temperature": 8.0, "current_temperature": 21.0, "min_temp": 7, "max_temp": 35})
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 20.0})
+    hass.states.async_set("schedule.hk1", "on")
+    coordinator = await _setup(hass, _hk1_entry(schedule="schedule.hk1"))
+    sel = async_mock_service(hass, "select", "select_option")
+    num = async_mock_service(hass, "number", "set_value")
+    async_mock_service(hass, "climate", "set_temperature")
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
+        coordinator._started = 0
+        await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["decision"] != "circuit_off"
+    assert [c.data["option"] for c in sel] == ["2_heizen"]
+    assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-0.8]  # 22,0 − 22,8
