@@ -1,0 +1,15 @@
+# Testumgebung für HEATING-2: HA mit der Integration, auf Unraid über dev-unraid.sh
+# Aufruf: ~/Developer/_werkzeuge/dev-unraid.sh ~/Developer/home-assistant/heating-core docker-compose.dev.yml
+# Oberfläche: http://192.168.178.230:8126 (nur intern); Daten in data/ (bleiben auf Unraid)
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.4
+    container_name: dev-heating-core-ha
+    restart: unless-stopped
+    ports:
+      - "8126:8123"
+    environment:
+      TZ: Europe/Vienna
+    volumes:
+      - ./data:/config
+      - ./custom_components:/config/custom_components:ro

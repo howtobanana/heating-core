@@ -22,6 +22,8 @@ jobs:
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
+    # HACS prüft nur öffentliche Repos; läuft ab der Veröffentlichung (HEATING-7)
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: hacs/action@main
