@@ -54,7 +54,8 @@
   "state": "off",
   "attributes": {},
   "device": "Perg",
-  "key": "write_enabled"
+  "key": "write_enabled",
+  "model": "Oekofen"
  },
  "sensor.hk1_heizkorper_og_setpoint": {
   "state": "25.5",

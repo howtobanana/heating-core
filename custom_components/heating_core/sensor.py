@@ -58,6 +58,7 @@ class CircuitTarget(_Target):
             "wuerde_schreiben": d.get("would_write"),
             "problem": d.get("problem"),
             "schreib_budget_rest": d.get("budget_left"),
+            "schreib_budget": d.get("budget_total"),
             "kessel_temperatur": d.get("source_temp"),
             "kessel_freigabe": d.get("source_ok"),
             "pumpe_soll": d.get("pump_wanted"),

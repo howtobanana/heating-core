@@ -24,7 +24,7 @@ const html = (theme, variant) => `<!doctype html><html><head><meta charset="utf-
   for (const [id, e] of Object.entries(raw)) {
     hass.states[id] = { entity_id: id, state: e.state, attributes: e.attributes };
     hass.entities[id] = { entity_id: id, platform: e.key === "x" ? "schedule" : "heating_core", device_id: e.device, translation_key: e.key };
-    hass.devices[e.device] = { name: e.device };
+    hass.devices[e.device] = { name: e.device, model: e.model || hass.devices[e.device]?.model };
   }
   const el = document.createElement(window.__variant ? "heating-core-prototype" : "heating-core-panel");
   el.narrow = innerWidth < 870;

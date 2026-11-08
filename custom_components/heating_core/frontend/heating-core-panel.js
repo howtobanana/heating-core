@@ -80,7 +80,7 @@ class HeatingCorePanel extends HTMLElement {
     const byDevice = {};
     for (const e of Object.values(h.entities || {})) {
       if (e.platform !== "heating_core" || !h.states[e.entity_id]) continue;
-      const dev = (byDevice[e.device_id] ||= { id: e.device_id, name: h.devices?.[e.device_id]?.name || "", ent: {} });
+      const dev = (byDevice[e.device_id] ||= { id: e.device_id, name: h.devices?.[e.device_id]?.name || "", model: h.devices?.[e.device_id]?.model || "", ent: {} });
       dev.ent[e.translation_key || e.entity_id] = e.entity_id;
     }
     const devices = Object.values(byDevice);
@@ -212,7 +212,7 @@ class HeatingCorePanel extends HTMLElement {
 
   // ---- Schema: Kessel → Verteiler (Vorlauf/Rücklauf) → Pumpe → Heizkreis → Räume ----
 
-  _schema(info, narrow, fuel) {
+  _schema(info, narrow, fuel, brand) {
     if (!info.length) return "";
     const kessel = info.find((i) => i.floor)?.t.kessel_temperatur;
     const W = narrow ? 360 : 820;
@@ -279,9 +279,15 @@ class HeatingCorePanel extends HTMLElement {
     const tank = p === null ? "" : `<clipPath id="${clip}"><rect x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/></clipPath>
       <rect class="lvl" clip-path="url(#${clip})" x="${boiler.x}" y="${ly}" width="${boiler.w}" height="${boiler.y + boiler.h - ly}"/>`;
     const cx = boiler.x + boiler.w / 2, cyB = boiler.y + boiler.h / 2;
+    // Hersteller statt „Wärmeerzeuger“; Vaillant zeigt die freien Schreibvorgänge (Cloud-Budget je Stunde)
+    const title = { vaillant: "Vaillant", oekofen: "Ökofen" }[String(brand || "").toLowerCase()] || "Wärmeerzeuger";
+    const budget = info.find((i) => has(i.t.schreib_budget_rest));
+    const writes = budget ? `${budget.t.schreib_budget_rest}/${budget.t.schreib_budget}` : null;
+    const big = has(kessel) ? fmt(kessel, 0) + " °C" : writes || "–";
     s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
-      <text class="s mid" x="${cx}" y="${cyB - 24}">${narrow ? "Kessel" : fuel ? "Pelletkessel" : "Wärmeerzeuger"}</text>
-      <text class="big mid" x="${cx}" y="${cyB + 4}">${has(kessel) ? fmt(kessel, 0) + " °C" : "–"}</text>
+      <text class="s mid" x="${cx}" y="${cyB - 24}">${title}</text>
+      <text class="big mid" x="${cx}" y="${cyB + 4}">${big}</text>
+      ${!has(kessel) && writes ? `<text class="s mid" x="${cx}" y="${cyB + 24}">${narrow ? "Writes" : "Writes frei / h"}</text>` : ""}
       ${has(kg) ? `<text class="pel mid ${level} ${narrow ? "sm" : ""}" x="${cx}" y="${cyB + 28}">${Math.round(Number(kg)).toLocaleString("de-AT")} kg</text>` : ""}` + s;
     return `<svg class="schema ${narrow ? "" : "wide"}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Anlagenschema">${s}</svg>`;
   }
@@ -345,7 +351,7 @@ class HeatingCorePanel extends HTMLElement {
         </div>
       </div>
       ${problems.length ? `<div class="alert">${icon(I.warn, false, 20, 20)}<span>${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => " – " + (PROBLEMS[k] || k)))).join("<br>")}</span></div>` : ""}
-      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel))}${this._legend()}</section>
+      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel), sys.model)}${this._legend()}</section>
       ${info.map((i) => this._circuitGroup(i)).join("")}
       <section class="card"><h2>Grundwerte</h2>${this._slider(s.away_temp, "Abwesend")}</section>
     </div>`;

@@ -402,6 +402,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dec = Decision(False, "none", "circuit_off")
             out["mode"] = "circuit_off"
         out["decision"] = dec.reason
+        out["budget_total"] = WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget if lim.write_budget else None
         out["budget_left"] = (max(0, WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget - len([w for w in writes if now - w.ts < 3600]))
                               if lim.write_budget else None)
         out["would_write"] = dec.write
