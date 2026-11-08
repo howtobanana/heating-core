@@ -24,7 +24,6 @@ from .const import (
     F_CIRCUIT,
     F_CLIMATE,
     F_COMFORT,
-    F_COMFORT_ENTITY,
     F_HUMIDITY,
     F_PUMP,
     F_SOURCE_OFF,
@@ -169,106 +168,132 @@ class HeatingOptionsFlow(OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=schema)
 
 
-def _room_fields(d: dict) -> dict:
-    return {
-        _opt(F_COMFORT_ENTITY, d): _entity("input_number"),
-        _opt(F_PRESENCE, d): _entity("binary_sensor", multiple=True),
-        _opt(F_SCHEDULE, d): _entity("schedule"),
-        _opt(F_WINDOW, d): _entity("binary_sensor"),
-        _opt(F_TEMP, d): _entity("sensor", device_class="temperature"),
-    }
+def _common(d: dict, schedule: bool = True, window: bool = True, temp: bool = True) -> dict:
+    """Gemeinsame optionale Felder: Präsenz, Zeitplan, Fenster, Temperatursensor."""
+    out = {}
+    if schedule:
+        out[_opt(F_PRESENCE, d)] = _entity("binary_sensor", multiple=True)
+        out[_opt(F_SCHEDULE, d)] = _entity("schedule")
+    if window:
+        out[_opt(F_WINDOW, d)] = _entity("binary_sensor")
+    if temp:
+        out[_opt(F_TEMP, d)] = _entity("sensor", device_class="temperature")
+    return out
+
+
+def _req(key: str, d: dict) -> vol.Required:
+    return vol.Required(key, default=d[key]) if d.get(key) else vol.Required(key)
 
 
 class _BaseSubFlow(ConfigSubentryFlow):
-    def _schema(self, d: dict) -> vol.Schema:
+    """Zwei Schritte (Fabian, 09.11.2026): erst Name und Art/Rolle, dann nur die Felder, die dazu passen.
+    Komfort stellt man am Regler bzw. im Dashboard ein, nicht im Formular."""
+
+    _reconf: bool = False
+    _base: dict
+
+    def _base_schema(self, d: dict) -> vol.Schema:
+        raise NotImplementedError
+
+    def _detail_schema(self, d: dict) -> vol.Schema:
         raise NotImplementedError
 
     def _errors(self, data: dict) -> dict[str, str]:
         return {}
 
+    def _old(self) -> dict:
+        return {**self._get_reconfigure_subentry().data, CONF_NAME: self._get_reconfigure_subentry().title} if self._reconf else {}
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._errors(user_input)
-            if not errors:
-                title = user_input.pop(CONF_NAME)
-                return self.async_create_entry(title=title, data=user_input)
-        return self.async_show_form(step_id="user", data_schema=self._schema(user_input or {}), errors=errors)
+            self._base = user_input
+            return await self.async_step_details()
+        return self.async_show_form(step_id="user", data_schema=self._base_schema({}))
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        sub = self._get_reconfigure_subentry()
+        self._reconf = True
+        if user_input is not None:
+            self._base = user_input
+            return await self.async_step_details()
+        return self.async_show_form(step_id="reconfigure", data_schema=self._base_schema(self._old()))
+
+    async def async_step_details(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        old = self._old()
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = self._errors(user_input)
+            # nur Base + Details übernehmen: geleerte Felder sollen wirklich weg sein; Komfort-Startwert bleibt
+            data = {k: old[k] for k in (F_COMFORT,) if k in old} | self._base | user_input
+            errors = self._errors(data)
             if not errors:
-                title = user_input.pop(CONF_NAME)
-                return self.async_update_and_abort(self._get_entry(), sub, title=title, data=user_input)
-        data = user_input or {**sub.data, CONF_NAME: sub.title}
-        return self.async_show_form(step_id="reconfigure", data_schema=self._schema(data), errors=errors)
+                title = data.pop(CONF_NAME)
+                if self._reconf:
+                    return self.async_update_and_abort(self._get_entry(), self._get_reconfigure_subentry(), title=title, data=data)
+                return self.async_create_entry(title=title, data=data)
+        d = {**old, **self._base, **(user_input or {})}
+        return self.async_show_form(step_id="details", data_schema=self._detail_schema(d), errors=errors)
 
 
 class CircuitFlow(_BaseSubFlow):
-    """Heizkreis mit Master-Raum (Therme-Zone, Ökofen-Heizkreis …)."""
+    """Heizkreis mit Master (Therme-Zone, Ökofen-Heizkreis …) oder Fußboden extern mit eigener Pumpe."""
 
-    def _schema(self, d: dict) -> vol.Schema:
-        return vol.Schema(
-            {
-                vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
-                vol.Required(F_KIND, default=d.get(F_KIND, "radiator")): sel.SelectSelector(
-                    sel.SelectSelectorConfig(options=["radiator", "floor", KIND_FLOOR_EXTERNAL], translation_key=F_KIND)
-                ),
-                _opt(F_MASTER, d): _entity("climate"),
-                vol.Required(F_COMFORT, default=d.get(F_COMFORT, 21.0)): _temp(16, 25),
-                **_room_fields(d),
-                _opt(F_HUMIDITY, d): _entity("sensor", device_class="humidity"),
-                # nur „Fußboden extern“: eigene Pumpe, Freigabe über Kesseltemperatur
-                _opt(F_PUMP, d): _entity(["switch", "input_boolean"]),
-                _opt(F_SOURCE_TEMP, d): _entity("sensor"),
+    def _base_schema(self, d: dict) -> vol.Schema:
+        return vol.Schema({
+            vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
+            vol.Required(F_KIND, default=d.get(F_KIND, "radiator")): sel.SelectSelector(
+                sel.SelectSelectorConfig(options=["radiator", "floor", KIND_FLOOR_EXTERNAL], translation_key=F_KIND)
+            ),
+        })
+
+    def _detail_schema(self, d: dict) -> vol.Schema:
+        if d.get(F_KIND) == KIND_FLOOR_EXTERNAL:
+            return vol.Schema({
+                _req(F_PUMP, d): _entity(["switch", "input_boolean"]),
+                _req(F_SOURCE_TEMP, d): _entity("sensor"),
                 vol.Required(F_SOURCE_ON, default=d.get(F_SOURCE_ON, 50.0)): _num(20, 90, 1, "°C"),
                 vol.Required(F_SOURCE_OFF, default=d.get(F_SOURCE_OFF, 45.0)): _num(20, 90, 1, "°C"),
                 vol.Required(F_VALVE_DELAY, default=d.get(F_VALVE_DELAY, 180)): _num(0, 900, 10, "s"),
-            }
-        )
+                **_common(d, window=False, temp=False),  # Zeitplan/Präsenz erben die Zonen
+            })
+        return vol.Schema({
+            _req(F_MASTER, d): _entity("climate"),
+            **_common(d),
+            _opt(F_HUMIDITY, d): _entity("sensor", device_class="humidity"),
+        })
 
     def _errors(self, data: dict) -> dict[str, str]:
-        if data.get(F_KIND) == KIND_FLOOR_EXTERNAL:
-            if not data.get(F_PUMP) or not data.get(F_SOURCE_TEMP):
-                return {"base": "floor_needs_pump"}
-            if float(data[F_SOURCE_OFF]) >= float(data[F_SOURCE_ON]):
-                return {"base": "source_hysteresis"}
-        elif not data.get(F_MASTER):
-            return {"base": "master_required"}
+        if data.get(F_KIND) == KIND_FLOOR_EXTERNAL and float(data[F_SOURCE_OFF]) >= float(data[F_SOURCE_ON]):
+            return {"base": "source_hysteresis"}
         return {}
 
 
 class RoomFlow(_BaseSubFlow):
-    """Raum mit eigenem TRV (isoliert) oder Follower des Heizkreises."""
+    """Raum mit eigenem TRV (isoliert), Follower des Heizkreises oder Fußboden-Zone."""
 
-    def _schema(self, d: dict) -> vol.Schema:
+    def _base_schema(self, d: dict) -> vol.Schema:
         circuits = [
             sel.SelectOptionDict(value=sid, label=sub.title)
             for sid, sub in self._get_entry().subentries.items()
             if sub.subentry_type == SUB_CIRCUIT
         ]
-        return vol.Schema(
-            {
-                vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
-                vol.Required(F_CIRCUIT, default=d.get(F_CIRCUIT)) if d.get(F_CIRCUIT) else vol.Required(F_CIRCUIT): sel.SelectSelector(sel.SelectSelectorConfig(options=circuits)),
-                vol.Required(F_ROLE, default=d.get(F_ROLE, "isolated")): sel.SelectSelector(
-                    sel.SelectSelectorConfig(options=["isolated", "follower", ROLE_FLOOR_ZONE], translation_key=F_ROLE)
-                ),
-                _opt(F_CLIMATE, d): _entity("climate"),
-                _opt(F_VALVES, d): _entity(["switch", "input_boolean"], multiple=True),
-                vol.Required(F_COMFORT, default=d.get(F_COMFORT, 21.0)): _temp(16, 25),
-                vol.Required(F_OFFSET, default=d.get(F_OFFSET, -2.0)): _temp(-3, 2),
-                **_room_fields(d),
-            }
-        )
+        return vol.Schema({
+            vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
+            _req(F_CIRCUIT, d): sel.SelectSelector(sel.SelectSelectorConfig(options=circuits)),
+            vol.Required(F_ROLE, default=d.get(F_ROLE, "isolated")): sel.SelectSelector(
+                sel.SelectSelectorConfig(options=["isolated", "follower", ROLE_FLOOR_ZONE], translation_key=F_ROLE)
+            ),
+        })
 
-    def _errors(self, data: dict) -> dict[str, str]:
-        if data.get(F_ROLE) == ROLE_FLOOR_ZONE:
-            return {} if data.get(F_VALVES) else {"base": "zone_needs_valves"}
-        return {} if data.get(F_CLIMATE) else {"base": "climate_required"}
+    def _detail_schema(self, d: dict) -> vol.Schema:
+        role = d.get(F_ROLE)
+        if role == ROLE_FLOOR_ZONE:
+            return vol.Schema({_req(F_VALVES, d): _entity(["switch", "input_boolean"], multiple=True), **_common(d)})
+        if role == "follower":
+            return vol.Schema({
+                _req(F_CLIMATE, d): _entity("climate"),
+                vol.Required(F_OFFSET, default=d.get(F_OFFSET, -2.0)): _temp(-3, 2),
+                **_common(d, schedule=False, temp=False),
+            })
+        return vol.Schema({_req(F_CLIMATE, d): _entity("climate"), **_common(d)})
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         if not any(s.subentry_type == SUB_CIRCUIT for s in self._get_entry().subentries.values()):

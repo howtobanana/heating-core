@@ -60,40 +60,30 @@
           "title": "Heating circuit",
           "data": {
             "name": "Name",
-            "comfort_entity": "Comfort helper (optional)",
-            "presence_sensors": "Presence sensors",
-            "schedule": "Schedule",
-            "window": "Window sensor",
-            "temp_sensor": "Temperature sensor",
-            "comfort": "Comfort temperature",
-            "kind": "Type",
-            "master_climate": "Master thermostat / circuit",
-            "humidity_sensor": "Humidity sensor",
-            "pump_switch": "Pump (external floor only)",
-            "source_temp_sensor": "Boiler temperature (external floor only)",
-            "source_on": "Enable above boiler temperature",
-            "source_off": "Disable below boiler temperature",
-            "valve_delay_s": "Pump after valves open (s)"
+            "kind": "Type"
           }
         },
         "reconfigure": {
           "title": "Heating circuit",
           "data": {
             "name": "Name",
-            "comfort_entity": "Comfort helper (optional)",
+            "kind": "Type"
+          }
+        },
+        "details": {
+          "title": "Heating circuit – devices",
+          "data": {
+            "master_climate": "Master thermostat / circuit",
             "presence_sensors": "Presence sensors",
             "schedule": "Schedule",
-            "window": "Window sensor",
+            "window": "Window contact",
             "temp_sensor": "Temperature sensor",
-            "comfort": "Comfort temperature",
-            "kind": "Type",
-            "master_climate": "Master thermostat / circuit",
             "humidity_sensor": "Humidity sensor",
-            "pump_switch": "Pump (external floor only)",
-            "source_temp_sensor": "Boiler temperature (external floor only)",
-            "source_on": "Enable above boiler temperature",
-            "source_off": "Disable below boiler temperature",
-            "valve_delay_s": "Pump after valves open (s)"
+            "pump_switch": "Pump",
+            "source_temp_sensor": "Boiler temperature",
+            "source_on": "Release above boiler temperature",
+            "source_off": "Block below boiler temperature",
+            "valve_delay_s": "Pump only after valves opened (s)"
           }
         }
       },
@@ -101,9 +91,7 @@
         "reconfigure_successful": "Saved."
       },
       "error": {
-        "floor_needs_pump": "External floor needs pump and boiler temperature.",
-        "source_hysteresis": "Disable must be below enable.",
-        "master_required": "Please choose the master thermostat/circuit."
+        "source_hysteresis": "Disable must be below enable."
       }
     },
     "room": {
@@ -116,34 +104,28 @@
           "title": "Room",
           "data": {
             "name": "Name",
-            "comfort_entity": "Comfort helper (optional)",
-            "presence_sensors": "Presence sensors",
-            "schedule": "Schedule",
-            "window": "Window sensor",
-            "temp_sensor": "Temperature sensor",
-            "comfort": "Comfort temperature",
-            "circuit": "Circuit",
-            "role": "Role",
-            "climate": "Radiator thermostat (TRV)",
-            "offset": "Offset to master (followers)",
-            "valves": "Valve channels (floor zone, switch together)"
+            "circuit": "Heating circuit",
+            "role": "Role"
           }
         },
         "reconfigure": {
           "title": "Room",
           "data": {
             "name": "Name",
-            "comfort_entity": "Comfort helper (optional)",
-            "presence_sensors": "Presence sensors",
-            "schedule": "Schedule",
-            "window": "Window sensor",
-            "temp_sensor": "Temperature sensor",
-            "comfort": "Comfort temperature",
-            "circuit": "Circuit",
-            "role": "Role",
+            "circuit": "Heating circuit",
+            "role": "Role"
+          }
+        },
+        "details": {
+          "title": "Room – devices",
+          "data": {
             "climate": "Radiator thermostat (TRV)",
-            "offset": "Offset to master (followers)",
-            "valves": "Valve channels (floor zone, switch together)"
+            "valves": "Valve channels (switch together)",
+            "offset": "Offset to master",
+            "presence_sensors": "Presence sensors",
+            "schedule": "Own schedule (else the circuit's)",
+            "window": "Window contact",
+            "temp_sensor": "Temperature sensor"
           }
         }
       },
@@ -151,10 +133,7 @@
         "no_circuit": "Add a heating circuit first.",
         "reconfigure_successful": "Saved."
       },
-      "error": {
-        "zone_needs_valves": "Floor zone needs at least one valve.",
-        "climate_required": "Please choose the thermostat."
-      }
+      "error": {}
     }
   },
   "selector": {

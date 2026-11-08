@@ -60,37 +60,27 @@
           "title": "Heizkreis",
           "data": {
             "name": "Name",
-            "comfort_entity": "Komfort-Regler (optional)",
-            "presence_sensors": "Präsenzsensoren",
-            "schedule": "Zeitplan",
-            "window": "Fensterkontakt",
-            "temp_sensor": "Temperatursensor",
-            "comfort": "Komfort-Temperatur",
-            "kind": "Art",
-            "master_climate": "Master-Thermostat / Heizkreis",
-            "humidity_sensor": "Feuchtesensor",
-            "pump_switch": "Pumpe (nur Fußboden extern)",
-            "source_temp_sensor": "Kesseltemperatur (nur Fußboden extern)",
-            "source_on": "Freigabe ab Kesseltemperatur",
-            "source_off": "Sperre unter Kesseltemperatur",
-            "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)"
+            "kind": "Art"
           }
         },
         "reconfigure": {
           "title": "Heizkreis",
           "data": {
             "name": "Name",
-            "comfort_entity": "Komfort-Regler (optional)",
+            "kind": "Art"
+          }
+        },
+        "details": {
+          "title": "Heizkreis – Geräte",
+          "data": {
+            "master_climate": "Master-Thermostat / Heizkreis",
             "presence_sensors": "Präsenzsensoren",
             "schedule": "Zeitplan",
             "window": "Fensterkontakt",
             "temp_sensor": "Temperatursensor",
-            "comfort": "Komfort-Temperatur",
-            "kind": "Art",
-            "master_climate": "Master-Thermostat / Heizkreis",
             "humidity_sensor": "Feuchtesensor",
-            "pump_switch": "Pumpe (nur Fußboden extern)",
-            "source_temp_sensor": "Kesseltemperatur (nur Fußboden extern)",
+            "pump_switch": "Pumpe",
+            "source_temp_sensor": "Kesseltemperatur",
             "source_on": "Freigabe ab Kesseltemperatur",
             "source_off": "Sperre unter Kesseltemperatur",
             "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)"
@@ -101,9 +91,7 @@
         "reconfigure_successful": "Gespeichert."
       },
       "error": {
-        "floor_needs_pump": "Fußboden extern braucht Pumpe und Kesseltemperatur.",
-        "source_hysteresis": "Sperre muss unter der Freigabe liegen.",
-        "master_required": "Bitte das Master-Thermostat bzw. den Heizkreis wählen."
+        "source_hysteresis": "Sperre muss unter der Freigabe liegen."
       }
     },
     "room": {
@@ -116,34 +104,28 @@
           "title": "Raum",
           "data": {
             "name": "Name",
-            "comfort_entity": "Komfort-Regler (optional)",
-            "presence_sensors": "Präsenzsensoren",
-            "schedule": "Zeitplan",
-            "window": "Fensterkontakt",
-            "temp_sensor": "Temperatursensor",
-            "comfort": "Komfort-Temperatur",
             "circuit": "Heizkreis",
-            "role": "Rolle",
-            "climate": "Heizkörper-Thermostat (TRV)",
-            "offset": "Abstand zum Master (nur Follower)",
-            "valves": "Ventil-Kanäle (nur Fußboden-Zone, schalten gemeinsam)"
+            "role": "Rolle"
           }
         },
         "reconfigure": {
           "title": "Raum",
           "data": {
             "name": "Name",
-            "comfort_entity": "Komfort-Regler (optional)",
-            "presence_sensors": "Präsenzsensoren",
-            "schedule": "Zeitplan",
-            "window": "Fensterkontakt",
-            "temp_sensor": "Temperatursensor",
-            "comfort": "Komfort-Temperatur",
             "circuit": "Heizkreis",
-            "role": "Rolle",
+            "role": "Rolle"
+          }
+        },
+        "details": {
+          "title": "Raum – Geräte",
+          "data": {
             "climate": "Heizkörper-Thermostat (TRV)",
-            "offset": "Abstand zum Master (nur Follower)",
-            "valves": "Ventil-Kanäle (nur Fußboden-Zone, schalten gemeinsam)"
+            "valves": "Ventil-Kanäle (schalten gemeinsam)",
+            "offset": "Abstand zum Master",
+            "presence_sensors": "Präsenzsensoren",
+            "schedule": "Eigener Zeitplan (sonst der des Heizkreises)",
+            "window": "Fensterkontakt",
+            "temp_sensor": "Temperatursensor"
           }
         }
       },
@@ -151,10 +133,7 @@
         "no_circuit": "Bitte zuerst einen Heizkreis anlegen.",
         "reconfigure_successful": "Gespeichert."
       },
-      "error": {
-        "zone_needs_valves": "Fußboden-Zone braucht mindestens einen Ventil-Kanal.",
-        "climate_required": "Bitte das Thermostat wählen."
-      }
+      "error": {}
     }
   },
   "selector": {

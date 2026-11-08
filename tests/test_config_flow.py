@@ -59,3 +59,33 @@ async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_configure(result["flow_id"], {**defaults, "boost_enabled": False})
     assert result["type"] == "create_entry"
     assert entry.options["boost_enabled"] is False
+
+
+async def test_raum_zwei_schritte_und_feld_leeren(hass: HomeAssistant) -> None:
+    """Raum: erst Name/Heizkreis/Rolle, dann nur passende Felder; geleerter Sensor ist danach weg."""
+    from homeassistant.config_entries import ConfigSubentryData
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.heating_core.const import DOMAIN
+
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="P", unique_id="p", data={"name": "P", "manufacturer": "oekofen"},
+        subentries_data=[ConfigSubentryData(data={"kind": "radiator", "master_climate": "climate.hk1"},
+                                            subentry_id="hk1", subentry_type="circuit", title="HK1", unique_id=None)],
+    )
+    entry.add_to_hass(hass)
+    r = await hass.config_entries.subentries.async_init((entry.entry_id, "room"), context={"source": "user"})
+    assert set(str(k) for k in r["data_schema"].schema) == {"name", "circuit", "role"}
+    r = await hass.config_entries.subentries.async_configure(r["flow_id"], {"name": "Büro", "circuit": "hk1", "role": "isolated"})
+    assert r["step_id"] == "details"
+    keys = set(str(k) for k in r["data_schema"].schema)
+    assert "climate" in keys and "valves" not in keys and "offset" not in keys and "comfort" not in keys
+    r = await hass.config_entries.subentries.async_configure(r["flow_id"], {"climate": "climate.trv", "temp_sensor": "sensor.t"})
+    assert r["type"] == "create_entry"
+    sub = next(s for s in entry.subentries.values() if s.title == "Büro")
+    assert sub.data["temp_sensor"] == "sensor.t"
+    # Neu konfigurieren: Sensor leeren
+    r = await entry.start_subentry_reconfigure_flow(hass, sub.subentry_id)
+    r = await hass.config_entries.subentries.async_configure(r["flow_id"], {"name": "Büro", "circuit": "hk1", "role": "isolated"})
+    r = await hass.config_entries.subentries.async_configure(r["flow_id"], {"climate": "climate.trv"})
+    assert r["reason"] == "reconfigure_successful"
+    assert "temp_sensor" not in entry.subentries[sub.subentry_id].data
