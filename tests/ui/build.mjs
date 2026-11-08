@@ -23,7 +23,7 @@ const html = (theme, variant) => `<!doctype html><html><head><meta charset="utf-
   const hass = { states: {}, entities: {}, devices: {}, callService: () => {} };
   for (const [id, e] of Object.entries(raw)) {
     hass.states[id] = { entity_id: id, state: e.state, attributes: e.attributes };
-    hass.entities[id] = { entity_id: id, platform: "heating_core", device_id: e.device, translation_key: e.key };
+    hass.entities[id] = { entity_id: id, platform: e.key === "x" ? "schedule" : "heating_core", device_id: e.device, translation_key: e.key };
     hass.devices[e.device] = { name: e.device };
   }
   const el = document.createElement(window.__variant ? "heating-core-prototype" : "heating-core-panel");

@@ -1,11 +1,14 @@
 """Ökofen Pellematic (Integration oekofen-pellematic-compact).
 
-Gesteuert wird nur über den Offset `number.<kreis>_remote_override` (Entscheidung Fabian,
-08.11.2026); Heiz- und Absenktemperatur der Pellematic bleiben unangetastet. Fällt HA aus,
-wirkt der zuletzt gesetzte Offset weiter; die Kessellogik bleibt aktiv.
+Variante B (Fabian, 08.11.2026): Heating Core macht den Tagesablauf, die Pellematic rechnet
+immer mit ihrer eigenen Heizkurve. Geschrieben werden nur Betriebsart und Offset:
+- Ziel nahe Heiztemperatur → `select.<kreis>_mode_auto` = heizen, Basis `number.<kreis>_temp_heat`
+- Ziel nahe Absenktemperatur → absenken, Basis `number.<kreis>_temp_setback`
+- Feinabstimmung über `number.<kreis>_remote_override` (±3 K)
+Heiz- und Absenktemperatur der Pellematic bleiben unangetastet. „Schreiben aus“ gibt den Kreis
+zurück (auto, Offset 0): dann gilt wieder das eigene Zeitprogramm der Pellematic.
 
-Annahme (im Schattenbetrieb in Perg zu prüfen): `sensor.<kreis>_l_roomtemp_set` ist der
-wirksame Sollwert inklusive Offset. Basis ohne Offset = gemeldeter Sollwert − aktueller Offset.
+`l_roomtemp_set` taugt nicht als Basis: bei „Raumtemperatur erreicht“ meldet es 8 °C (HEATING-13).
 """
 
 from __future__ import annotations
@@ -24,10 +27,17 @@ def circuit_base(master_entity: str) -> str:
     return name[: -len("_climate")] if name.endswith("_climate") else name
 
 
-def offset_for(target: float, reported_setpoint: float, current_offset: float) -> float:
-    """Offset, damit der wirksame Sollwert `target` wird (auf 0,1 K, begrenzt auf ±3 K)."""
-    base = reported_setpoint - current_offset
+MODE_AUTO, MODE_HEAT, MODE_SETBACK = "1_auto", "2_heizen", "3_absenken"
+
+
+def offset_for(target: float, base: float) -> float:
+    """Offset auf die Basis (Heiz- oder Absenktemperatur), auf 0,1 K, begrenzt auf ±3 K."""
     return round(max(-MAX_OFFSET_K, min(MAX_OFFSET_K, target - base)), 1)
+
+
+def choose_mode(target: float, heat: float, setback: float) -> str:
+    """Heizen oder Absenken – je nachdem, welcher Pellematic-Wert näher am Ziel liegt."""
+    return MODE_HEAT if abs(target - heat) <= abs(target - setback) else MODE_SETBACK
 
 
 class OekofenAdapter:
@@ -44,19 +54,42 @@ class OekofenAdapter:
         base = f"sensor.{prefix}_pellematic_1_l_storage"
         return self._num(f"{base}_fill"), self._num(f"{base}_max")
 
+    def _ids(self, master_entity: str) -> dict[str, str]:
+        b = circuit_base(master_entity)
+        return {"mode": f"select.{b}_mode_auto", "heat": f"number.{b}_temp_heat", "setback": f"number.{b}_temp_setback",
+                "offset": f"number.{b}_remote_override", "text": f"sensor.{b}_l_statetext"}
+
+    def _base(self, ids: dict[str, str]) -> float | None:
+        """Heiz- oder Absenktemperatur, je nach Betriebsart (auto: nach aktueller Phase)."""
+        mode = (self.hass.states.get(ids["mode"]) or _NONE).state
+        text = (self.hass.states.get(ids["text"]) or _NONE).state
+        setback = mode == MODE_SETBACK or (mode == MODE_AUTO and text.startswith("Absenk"))
+        return self._num(ids["setback"] if setback else ids["heat"])
+
     def read(self, master_entity: str) -> CircuitState:
         st = self.hass.states.get(master_entity)
         if st is None or st.state in ("unavailable", "unknown"):
             return CircuitState(None, None, False)
-        base = circuit_base(master_entity)
-        setpoint = self._num(f"sensor.{base}_l_roomtemp_set")
-        if setpoint is None:
-            setpoint = _float(st.attributes.get("temperature"))
-        current = self._num(f"sensor.{base}_l_roomtemp_act")
+        ids = self._ids(master_entity)
+        base, offset = self._base(ids), self._num(ids["offset"])
+        setpoint = round(base + offset, 1) if base is not None and offset is not None else None
+        current = self._num(f"sensor.{circuit_base(master_entity)}_l_roomtemp_act")
         if current is None:
             current = _float(st.attributes.get("current_temperature"))
         # climate „off“ = Pellematic hat den Kreis abgeschaltet (Heizgrenze, Aus) -> nicht übersteuern
-        return CircuitState(setpoint, current, True, heating_off=st.state == "off")
+        return CircuitState(setpoint, current, setpoint is not None, heating_off=st.state == "off")
+
+    def needs_takeover(self, master_entity: str) -> bool:
+        """Läuft der Kreis noch im eigenen Zeitprogramm (auto), obwohl Heating Core steuern soll?"""
+        return (self.hass.states.get(self._ids(master_entity)["mode"]) or _NONE).state == MODE_AUTO
+
+    async def release(self, master_entity: str) -> None:
+        """Schreiben aus: Kreis zurück ans eigene Zeitprogramm (auto, Offset 0)."""
+        ids = self._ids(master_entity)
+        if (self.hass.states.get(ids["mode"]) or _NONE).state in (MODE_HEAT, MODE_SETBACK):
+            await self.hass.services.async_call("select", "select_option", {"entity_id": ids["mode"], "option": MODE_AUTO}, blocking=True)
+        if self._num(ids["offset"]) not in (None, 0.0):
+            await self.hass.services.async_call("number", "set_value", {"entity_id": ids["offset"], "value": 0}, blocking=True)
 
     def limits(self, master_entity: str) -> AdapterLimits:
         st = self.hass.states.get(master_entity)
@@ -68,20 +101,21 @@ class OekofenAdapter:
             confirm_delay_s=10 * 60,
         )
 
-    def offset(self, master_entity: str, target: float) -> float | None:
-        state = self.read(master_entity)
-        current = self._num(f"number.{circuit_base(master_entity)}_remote_override")
-        if not state.available or state.setpoint is None or current is None:
-            return None
-        return offset_for(target, state.setpoint, current)
-
     async def write_setpoint(self, master_entity: str, value: float) -> None:
-        offset = self.offset(master_entity, value)
-        if offset is None:
-            raise ValueError(f"Offset für {master_entity} nicht berechenbar")
-        await self.hass.services.async_call(
-            "number",
-            "set_value",
-            {"entity_id": f"number.{circuit_base(master_entity)}_remote_override", "value": offset},
-            blocking=True,
-        )
+        ids = self._ids(master_entity)
+        heat, setback = self._num(ids["heat"]), self._num(ids["setback"])
+        if heat is None or setback is None:
+            raise ValueError(f"Heiz-/Absenktemperatur für {master_entity} unbekannt")
+        mode = choose_mode(value, heat, setback)
+        if (self.hass.states.get(ids["mode"]) or _NONE).state != mode:
+            await self.hass.services.async_call("select", "select_option", {"entity_id": ids["mode"], "option": mode}, blocking=True)
+        offset = offset_for(value, heat if mode == MODE_HEAT else setback)
+        if self._num(ids["offset"]) != offset:
+            await self.hass.services.async_call("number", "set_value", {"entity_id": ids["offset"], "value": offset}, blocking=True)
+
+
+class _None:
+    state = ""
+
+
+_NONE = _None()

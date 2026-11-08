@@ -174,7 +174,7 @@ class HeatingCorePanel extends HTMLElement {
       <text x="50" y="67" class="rs">${st ? `Ist ${fmt(ist)}°` : "Ist"}</text></svg>`;
   }
 
-  _tile({ name, ist, soll, mode, problem, ent, note, iconSvg }) {
+  _tile({ name, ist, soll, mode, problem, ent, note, iconSvg, plan }) {
     const tone = this._tone(mode, problem);
     const comfort = this._st(ent.comfort);
     const presence = this._on(ent.presence);
@@ -187,8 +187,27 @@ class HeatingCorePanel extends HTMLElement {
       ${comfort ? `<div class="stepper"><button data-step="${ent.comfort}" data-d="-1" aria-label="Komfort niedriger">−</button>
         <span>Komfort</span>
         <button data-step="${ent.comfort}" data-d="1" aria-label="Komfort höher">+</button></div>` : ""}
+      ${this._setback(ent.setback)}
+      ${this._planLine(plan)}
       ${ent.pre_heat ? `<button class="chip ${this._on(ent.pre_heat) ? "on" : ""}" data-toggle="${ent.pre_heat}">Vorheizen</button>` : ""}
     </div>`;
+  }
+
+  // Absenkung je Kreis/Raum als kleine Zeile mit −/+
+  _setback(id) {
+    const st = this._st(id);
+    if (!st) return "";
+    return `<div class="mini"><button data-step="${id}" data-d="-1" aria-label="Absenkung niedriger">−</button>
+      <span>Absenkung <b>${fmt(st.state)}°</b></span><button data-step="${id}" data-d="1" aria-label="Absenkung höher">+</button></div>`;
+  }
+
+  // Zeitplan (HA-Zeitplan-Helfer): an/aus bis …, Klick öffnet die Helfer
+  _planLine(id) {
+    if (!id) return `<div class="note">Kein Zeitplan – immer Komfort</div>`;
+    const st = this._st(id);
+    const next = st?.attributes?.next_event ? new Date(st.attributes.next_event).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) : "";
+    return `<button class="plan ${st?.state === "on" ? "on" : ""}" data-nav="/config/helpers" title="${esc(id)}">
+      Zeitplan ${st?.state === "on" ? "Komfort" : "Absenkung"}${next ? ` bis ${next}` : ""}</button>`;
   }
 
   // ---- Schema: Kessel → Verteiler (Vorlauf/Rücklauf) → Pumpe → Heizkreis → Räume ----
@@ -296,10 +315,10 @@ class HeatingCorePanel extends HTMLElement {
         <div class="note">${t.pumpe_soll !== t.pumpe_ist && t.pumpe_soll != null ? `würde ${t.pumpe_soll ? "ein" : "aus"}schalten` : `Freigabe ${t.kessel_freigabe ? "ja" : "nein"}`}</div>
         ${i.ent.pre_heat ? `<button class="chip ${this._on(i.ent.pre_heat) ? "on" : ""}" data-toggle="${i.ent.pre_heat}">Vorheizen</button>` : ""}</div>`);
     } else {
-      tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow) }));
+      tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow), plan: t.zeitplan }));
     }
     for (const z of i.rooms) {
-      tiles.push(this._tile({ ...z, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) ? `Thermostat ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
+      tiles.push(this._tile({ ...z, plan: z.t.zeitplan, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) ? `Thermostat ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
     }
     return `<section class="group">
       <div class="ghead"><h2>${esc(i.name)}</h2>${this._badge(i.mode, i.problem)}</div>
@@ -371,6 +390,10 @@ class HeatingCorePanel extends HTMLElement {
     const menu = this.shadowRoot.querySelector("ha-menu-button");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => this._toggle(b.dataset.toggle)));
+    this.shadowRoot.querySelectorAll("[data-nav]").forEach((b) => b.addEventListener("click", () => {
+      history.pushState(null, "", b.dataset.nav);
+      window.dispatchEvent(new CustomEvent("location-changed"));
+    }));
     this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d))));
     this.shadowRoot.querySelectorAll("[data-dial]").forEach((svg) => this._wireDial(svg));
     this.shadowRoot.querySelectorAll("[data-number]").forEach((inp) => {
@@ -448,6 +471,11 @@ const CSS = `
   .stepper { display:flex; align-items:center; gap: 10px; margin-top: 6px; font-size: 12px; color: var(--secondary-text-color); }
   .stepper span { display:flex; flex-direction:column; align-items:center; min-width: 56px; } .stepper b { font-size: 15px; color: var(--primary-text-color); }
   .stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); font-size: 18px; line-height: 1; }
+  .mini { display:flex; align-items:center; gap: 8px; font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
+  .mini button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font-size: 14px; line-height: 1; }
+  .mini b { color: var(--primary-text-color); }
+  .plan { border: 0; background: var(--secondary-background-color); color: var(--secondary-text-color); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; margin-top: 4px; }
+  .plan.on { background: ${HOT}22; color: var(--primary-text-color); }
   .chip { border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin-top: 4px; }
   .chip.on { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
   .slider { display:grid; grid-template-columns: 90px 1fr 70px; align-items:center; gap:8px; font-size: 14px; margin: 8px 0; }

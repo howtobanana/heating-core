@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from typing import Any
 
@@ -94,6 +94,7 @@ class ControlState:
     pre_heat: dict[str, float] = field(default_factory=dict)  # Subentry -> Start (Sekunden)
     source_ok: dict[str, bool] = field(default_factory=dict)  # Fußbodenkreis -> Kessel freigegeben
     comfort: dict[str, float] = field(default_factory=dict)  # Regler „Komfort“ je Kreis/Raum
+    setback: dict[str, float] = field(default_factory=dict)  # Regler „Absenkung“ je Kreis/Raum
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
 
@@ -220,6 +221,33 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return self.control.comfort[sid]
         return self._num(cfg.get(F_COMFORT_ENTITY)) or float(cfg.get(F_COMFORT, 20.0))
 
+    def setback(self, sid: str, g_eco: float) -> float:
+        """Absenkung: eigener Regler > Wert aus dem Formular > Kreis des Raums > Eco der Anlage."""
+        if sid in self.control.setback:
+            return self.control.setback[sid]
+        sub = self.entry.subentries.get(sid)
+        data = sub.data if sub else {}
+        if data.get("setback") is not None:
+            return float(data["setback"])
+        if data.get(F_CIRCUIT):
+            return self.setback(data[F_CIRCUIT], g_eco)
+        return g_eco
+
+    def schedule(self, cfg: dict) -> str | None:
+        """Zeitplan: eigener des Raums, sonst der seines Heizkreises (Fabian, 08.11.2026)."""
+        if cfg.get(F_SCHEDULE):
+            return cfg[F_SCHEDULE]
+        parent = self.entry.subentries.get(cfg.get(F_CIRCUIT) or "")
+        return parent.data.get(F_SCHEDULE) if parent else None
+
+    async def async_release(self) -> None:
+        """Schreiben aus: Anlage zurück an ihre eigene Steuerung (Ökofen: auto, Offset 0)."""
+        release = getattr(self.adapter, "release", None)
+        if release:
+            for ccfg in self.circuits().values():
+                if ccfg.get(F_MASTER):
+                    await release(ccfg[F_MASTER])
+
     def globals(self) -> Globals:
         return Globals(
             eco=self.control.eco if self.control.eco is not None else float(self.opt(OPT_ECO)),
@@ -250,6 +278,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return await self._floor_circuit(cid, ccfg, g, now)
         master_entity = ccfg.get(F_MASTER)
         state = self.adapter.read(master_entity)
+        g_all, g = g, replace(g, eco=self.setback(cid, g.eco))
         out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": state.available}
         if not state.available:
             out["problem"] = "master_unavailable"
@@ -262,10 +291,11 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 followers.append((rid, rcfg))
                 continue
             r_in = self._room_input(rid, rcfg, now)
+            g_room = replace(g_all, eco=self.setback(rid, g_all.eco))
             if r_in is None:
                 out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": "unavailable", "target": None, "problem": "room_unavailable"}
                 continue
-            r_res = room_target(g, r_in)
+            r_res = room_target(g_room, r_in)
             isolated.append((r_in, r_res))
             out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": r_res.mode, "target": r_res.target, "entity": rcfg[F_CLIMATE],
                                  "setpoint": r_in.current_setpoint, "presence": r_in.presence_on, "current": r_in.current_temp,
@@ -338,7 +368,10 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         out["decision"] = dec.reason
         out["budget_left"] = max(0, WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget - len([w for w in writes if now - w.ts < 3600]))
         out["would_write"] = dec.write
-        if dec.write and self.control.write_enabled:
+        # Variante B: läuft die Anlage noch im eigenen Zeitprogramm, einmal übernehmen
+        takeover = getattr(self.adapter, "needs_takeover", None)
+        takeover = bool(takeover and takeover(master_entity)) and not state.heating_off and now - self._started >= STARTUP_GUARD_S
+        if (dec.write or takeover) and self.control.write_enabled:
             await self.adapter.write_setpoint(master_entity, m_res.target)
             writes.append(Write(now, m_res.target, dec.kind))
             del writes[:-20]
@@ -366,12 +399,13 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             temp = self._num(rcfg.get(F_TEMP))
             win = self._window(rcfg.get(F_WINDOW), now)
             presence_on = self._presence(rid, rcfg.get(F_PRESENCE) or [], now)
-            schedule_on = self._on(rcfg.get(F_SCHEDULE))
-            target, _active = room_base(g, RoomInput(
+            sched = self.schedule(rcfg)
+            schedule_on = self._on(sched)
+            target, _active = room_base(replace(g, eco=self.setback(rid, g.eco)), RoomInput(
                 comfort=self._comfort(rcfg, rid), current_temp=temp or 0.0, current_setpoint=0.0,
                 schedule_on=schedule_on, presence_on=presence_on,
                 pre_heat_on=self._pre_heat(rid, now, presence_on or schedule_on),
-                has_demand_source=bool(rcfg.get(F_SCHEDULE) or rcfg.get(F_PRESENCE)),
+                has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
                 window_open_too_long=win.open_too_long,
             ))
             zones.append(Zone(rid, temp, target, open_now, open_since, any(r.state == "on" for r in readings)))
@@ -433,7 +467,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
         win = self._window(rcfg.get(F_WINDOW), now)
         r_presence = self._presence(rid, rcfg.get(F_PRESENCE) or [], now)
-        r_schedule = self._on(rcfg.get(F_SCHEDULE))
+        sched = self.schedule(rcfg)
+        r_schedule = self._on(sched)
         return RoomInput(
             comfort=self._comfort(rcfg, rid),
             current_temp=current,
@@ -441,7 +476,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             schedule_on=r_schedule,
             presence_on=r_presence,
             pre_heat_on=self._pre_heat(rid, now, r_presence or r_schedule),
-            has_demand_source=bool(rcfg.get(F_SCHEDULE) or rcfg.get(F_PRESENCE)),
+            has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             window_closed_recently=win.closed_recently,
         )

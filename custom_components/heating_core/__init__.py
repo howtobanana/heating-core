@@ -10,7 +10,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .adapters import get_adapter
+from .const import CONF_MANUFACTURER, DOMAIN, F_MASTER
 from .coordinator import HeatingCoordinator
 
 PANEL_URL = "heizung"
@@ -45,6 +46,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> 
     return ok
 
 
+async def async_remove_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> None:
+    """Integration entfernt: Anlage zurück an ihre eigene Steuerung (Ökofen: auto, Offset 0)."""
+    release = getattr(get_adapter(hass, entry.data.get(CONF_MANUFACTURER, "")), "release", None)
+    if release:
+        for sub in entry.subentries.values():
+            if sub.data.get(F_MASTER):
+                await release(sub.data[F_MASTER])
+
+
 async def _register_panel(hass: HomeAssistant) -> None:
     """Eigene Seite „Heizung“ in der Seitenleiste (einmal, für alle Anlagen)."""
     if hass.data.get(f"{DOMAIN}_panel") or "frontend" not in hass.config.components:
@@ -60,7 +70,7 @@ async def _register_panel(hass: HomeAssistant) -> None:
         webcomponent_name="heating-core-panel",
         sidebar_title="Heizung",
         sidebar_icon="mdi:radiator",
-        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.5.7",
+        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.6.0",
         require_admin=False,
     )
     hass.data[f"{DOMAIN}_panel"] = True

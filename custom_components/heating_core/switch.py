@@ -42,6 +42,8 @@ class ControlSwitch(HeatingEntity, SwitchEntity, RestoreEntity):
     async def _set(self, value: bool) -> None:
         setattr(self.coordinator.control, self._key, value)
         self.async_write_ha_state()
+        if self._key == "write_enabled" and not value:
+            await self.coordinator.async_release()  # Anlage zurück an ihre eigene Steuerung (HEATING-14)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self, **kwargs) -> None:

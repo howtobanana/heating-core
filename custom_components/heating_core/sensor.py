@@ -31,6 +31,12 @@ class _Target(HeatingEntity, SensorEntity):
         self._sid = sid
         self._attr_translation_key = "target"
 
+    def _plan(self) -> dict:
+        """Zeitplan (eigener oder vom Heizkreis geerbt) und Absenkung, für die Seite „Heizung“."""
+        c = self.coordinator
+        sub = c.entry.subentries.get(self._sid)
+        return {"zeitplan": c.schedule(dict(sub.data)) if sub else None, "absenkung": c.setback(self._sid, c.globals().eco)}
+
 
 class CircuitTarget(_Target):
     def _data(self) -> dict:
@@ -57,6 +63,7 @@ class CircuitTarget(_Target):
             "wuerde_schalten": d.get("would_switch"),
             "ist_temperatur": d.get("current"),
             "anlage": self.coordinator.entry.title,
+            **self._plan(),
         }
 
 
@@ -80,7 +87,7 @@ class RoomTarget(_Target):
         return {"modus": d.get("mode"), "trv_sollwert": d.get("setpoint"), "ist_temperatur": d.get("current"),
                 "waermebedarf": d.get("heat_demand"), "problem": d.get("problem"),
                 "ventile_offen": d.get("valves_open"), "ventile_soll": d.get("valves_wanted"),
-                "heizkreis": self._circuit().get("name")}
+                "heizkreis": self._circuit().get("name"), **self._plan()}
 
 
 def _find(coordinator, sid: str, circuit: bool) -> dict:

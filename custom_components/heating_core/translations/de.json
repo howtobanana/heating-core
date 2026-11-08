@@ -237,6 +237,9 @@
       },
       "away_temp": {
         "name": "Abwesend-Temperatur"
+      },
+      "setback": {
+        "name": "Absenkung"
       }
     }
   }

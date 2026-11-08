@@ -237,6 +237,9 @@
       },
       "away_temp": {
         "name": "Away temperature"
+      },
+      "setback": {
+        "name": "Setback"
       }
     }
   }
