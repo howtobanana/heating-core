@@ -123,3 +123,7 @@ class Fuel(HeatingEntity, SensorEntity):
     @property
     def native_value(self):
         return (self.coordinator.data or {}).get("fuel_kg")
+
+    @property
+    def extra_state_attributes(self):
+        return {"max_kg": (self.coordinator.data or {}).get("fuel_max_kg")}
