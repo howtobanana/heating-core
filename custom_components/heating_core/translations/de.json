@@ -43,7 +43,8 @@
           "pre_heat_timeout_min": "Vorheizen höchstens (min)",
           "push_enabled": "Push aufs Handy",
           "notify_devices": "Handys (Mobile App)",
-          "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)"
+          "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)",
+          "leitstand_expert": "Leitstand Expert (alle Details jedes Laufs als HA-Meldung)"
         }
       }
     }

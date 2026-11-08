@@ -63,3 +63,11 @@ async def test_push_bei_schreiben_und_ruhezeit(hass: HomeAssistant, states) -> N
     hass.states.async_set("climate.trv_buero", "unavailable")
     await _ready(coordinator)
     assert pushes == []
+
+
+async def test_leitstand_expert_optional(hass: HomeAssistant, states) -> None:
+    coordinator = await _setup(hass, _entry(leitstand_expert=True))
+    created = async_mock_service(hass, "persistent_notification", "create")
+    await _ready(coordinator)
+    expert = [c.data for c in created if c.data["notification_id"].endswith("_expert")]
+    assert expert and "Kreis: Soll" in expert[0]["message"] and "Büro" in expert[0]["message"]

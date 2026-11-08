@@ -36,6 +36,7 @@ OPT_PRE_HEAT_TIMEOUT_MIN = "pre_heat_timeout_min"
 OPT_NOTIFY_DEVICES = "notify_devices"
 OPT_PUSH_ENABLED = "push_enabled"
 OPT_QUIET_SCHEDULE = "quiet_schedule"
+OPT_EXPERT = "leitstand_expert"
 
 DEFAULTS = {
     OPT_ECO: 19.0,
@@ -60,6 +61,7 @@ DEFAULTS = {
     OPT_PRE_HEAT_TIMEOUT_MIN: 90,
     OPT_NOTIFY_DEVICES: [],
     OPT_PUSH_ENABLED: True,
+    OPT_EXPERT: False,
 }
 
 # Felder in Heizkreis- und Raum-Subentries

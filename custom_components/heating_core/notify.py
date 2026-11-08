@@ -2,7 +2,8 @@
 
 - Problem-Meldung in HA: erscheint immer bei Problemen und verschwindet von selbst, sobald alles passt.
 - Push aufs Handy (Mobile-App-Geräte aus den Optionen): bei Schreibvorgängen am Heizkreis und neuen
-  Problemen; während des Ruhezeit-Zeitplans still. Den „Leitstand Expert“ ersetzt die Seite „Heizung“.
+  Problemen; während des Ruhezeit-Zeitplans still.
+- Leitstand Expert (Option, Standard aus): alle Details jedes Laufs als HA-Meldung, überschreibt sich.
 """
 
 from __future__ import annotations
@@ -12,9 +13,9 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
-from homeassistant.util import slugify
+from homeassistant.util import dt as dt_util, slugify
 
-from .const import OPT_NOTIFY_DEVICES, OPT_PUSH_ENABLED, OPT_QUIET_SCHEDULE
+from .const import OPT_EXPERT, OPT_NOTIFY_DEVICES, OPT_PUSH_ENABLED, OPT_QUIET_SCHEDULE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +45,29 @@ def collect_problems(data: dict) -> list[str]:
             if r.get("problem"):
                 out.append(f"{PROBLEM_TEXT.get(r['problem'], r['problem'])}: {r.get('name')}")
     return out
+
+
+def _n(v) -> str:
+    return "–" if v is None else f"{float(v):.1f}".replace(".", ",")
+
+
+def expert_text(data: dict, events: list[str]) -> str:
+    """Leitstand Expert: je Kreis Soll/Anlage/Entscheidung/Budget, je Raum Soll/Ist/TRV/Modus."""
+    g = (data or {}).get("globals")
+    lines = []
+    if g is not None:
+        lines.append(f"Abwesend {'✅' if g.away_effective else '⬜'} · Sommer {'✅' if g.summer else '⬜'} · Abwesend-Temp {_n(g.away_temp)} °C")
+    for c in (data or {}).get("circuits", {}).values():
+        lines.append("")
+        lines.append(f"🌡️ {c.get('name')}: Soll {_n(c.get('target'))} · Anlage {_n(c.get('set_now'))} · Ist {_n(c.get('current'))} °C")
+        lines.append(f"   Modus {c.get('mode')} · Entscheidung {c.get('decision')} · Budget {c.get('budget_left')}"
+                     + (f" · würde schalten: {', '.join(c['would_switch'])}" if c.get("would_switch") else ""))
+        for r in c.get("rooms", {}).values():
+            lines.append(f"   ▸ {r.get('name')}: Soll {_n(r.get('target'))} · Ist {_n(r.get('current'))} · TRV {_n(r.get('setpoint'))} · {r.get('mode')}"
+                         + (f" · ⚠️ {r['problem']}" if r.get("problem") else ""))
+    if events:
+        lines += ["", "✍️ " + " | ".join(events)]
+    return "\n".join(lines)
 
 
 class Notifier:
@@ -105,3 +129,10 @@ class Notifier:
                 await self.push(title, "\n".join(new))
         if events:
             await self.push(f"🔥 Heizung {self.entry.title}", "\n".join(events))
+        if self._opt(OPT_EXPERT, False):
+            await self.hass.services.async_call(
+                "persistent_notification", "create",
+                {"notification_id": f"heating_core_{self.entry.entry_id}_expert",
+                 "title": f"🔍 Heizung {self.entry.title} – Expert ({dt_util.now():%H:%M:%S})",
+                 "message": expert_text(data, events)}, blocking=True,
+            )

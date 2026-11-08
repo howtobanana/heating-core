@@ -43,7 +43,8 @@
           "pre_heat_timeout_min": "Pre-heat timeout (min)",
           "push_enabled": "Push to phone",
           "notify_devices": "Phones (mobile app)",
-          "quiet_schedule": "Quiet time (schedule, no pushes)"
+          "quiet_schedule": "Quiet time (schedule, no pushes)",
+          "leitstand_expert": "Expert log (full details of every run as notification)"
         }
       }
     }

@@ -62,6 +62,7 @@ from .const import (
     OPT_NOTIFY_DEVICES,
     OPT_PUSH_ENABLED,
     OPT_QUIET_SCHEDULE,
+    OPT_EXPERT,
     OPT_SUMMER_ENTITY,
     OPT_WEATHER_ENABLED,
     OPT_WEATHER_ZONE1,
@@ -162,6 +163,7 @@ class HeatingOptionsFlow(OptionsFlow):
                     sel.DeviceSelectorConfig(integration="mobile_app", multiple=True)
                 ),
                 _opt(OPT_QUIET_SCHEDULE, o): _entity("schedule"),
+                vol.Required(OPT_EXPERT, default=o[OPT_EXPERT]): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
