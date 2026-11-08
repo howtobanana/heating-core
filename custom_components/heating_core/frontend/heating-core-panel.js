@@ -486,4 +486,4 @@ const CSS = `
   :disabled { cursor: not-allowed; }
 `;
 
-customElements.define("heating-core-panel", HeatingCorePanel);
+if (!customElements.get("heating-core-panel")) customElements.define("heating-core-panel", HeatingCorePanel); // HA lädt das Modul nach Updates teils doppelt
