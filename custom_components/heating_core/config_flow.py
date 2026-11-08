@@ -76,7 +76,8 @@ def _temp(lo: float, hi: float, step: float = 0.5) -> sel.NumberSelector:
 
 
 def _num(lo: float, hi: float, step: float = 1, unit: str | None = None) -> sel.NumberSelector:
-    return sel.NumberSelector(sel.NumberSelectorConfig(min=lo, max=hi, step=step, unit_of_measurement=unit, mode=sel.NumberSelectorMode.BOX))
+    extra = {"unit_of_measurement": unit} if unit else {}  # None lehnt HA ab (Optionen öffneten mit 400)
+    return sel.NumberSelector(sel.NumberSelectorConfig(min=lo, max=hi, step=step, mode=sel.NumberSelectorMode.BOX, **extra))
 
 
 def _entity(domain: str | list[str], multiple: bool = False, device_class: str | None = None) -> sel.EntitySelector:

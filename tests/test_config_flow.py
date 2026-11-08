@@ -42,3 +42,20 @@ async def test_einrichten_und_entladen(hass: HomeAssistant) -> None:
     assert entry.state is config_entries.ConfigEntryState.LOADED
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.state is config_entries.ConfigEntryState.NOT_LOADED
+
+
+async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
+    """Optionen lassen sich öffnen und speichern (Boost aus, Fabian 08.11.2026)."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.heating_core.const import DOMAIN
+
+    entry = MockConfigEntry(domain=DOMAIN, title="P", unique_id="p", data={"name": "P", "manufacturer": "oekofen"})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+    defaults = {k.schema: k.default() for k in result["data_schema"].schema if callable(getattr(k, "default", None))}
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**defaults, "boost_enabled": False})
+    assert result["type"] == "create_entry"
+    assert entry.options["boost_enabled"] is False
