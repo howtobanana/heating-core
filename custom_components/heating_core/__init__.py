@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from homeassistant.components import frontend, panel_custom
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .const import DOMAIN
 from .coordinator import HeatingCoordinator
+
+PANEL_URL = "heizung"
+STATIC_URL = "/heating_core_static"
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SENSOR, Platform.SWITCH]
 
@@ -14,6 +22,7 @@ type HeatingConfigEntry = ConfigEntry[HeatingCoordinator]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> bool:
+    await _register_panel(hass)
     coordinator = HeatingCoordinator(hass, entry)
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -29,4 +38,29 @@ async def _reload(hass: HomeAssistant, entry: HeatingConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    others = [e for e in hass.config_entries.async_loaded_entries(DOMAIN) if e.entry_id != entry.entry_id]
+    if ok and not others and hass.data.pop(f"{DOMAIN}_panel", False):
+        frontend.async_remove_panel(hass, PANEL_URL)
+    return ok
+
+
+async def _register_panel(hass: HomeAssistant) -> None:
+    """Eigene Seite „Heizung“ in der Seitenleiste (einmal, für alle Anlagen)."""
+    if hass.data.get(f"{DOMAIN}_panel") or "frontend" not in hass.config.components:
+        return  # ohne Frontend (z. B. in Tests) keine Seite
+    if not hass.data.get(f"{DOMAIN}_static"):
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(STATIC_URL, str(Path(__file__).parent / "frontend"), cache_headers=False)]
+        )
+        hass.data[f"{DOMAIN}_static"] = True
+    await panel_custom.async_register_panel(
+        hass,
+        frontend_url_path=PANEL_URL,
+        webcomponent_name="heating-core-panel",
+        sidebar_title="Heizung",
+        sidebar_icon="mdi:radiator",
+        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.2.0",
+        require_admin=False,
+    )
+    hass.data[f"{DOMAIN}_panel"] = True

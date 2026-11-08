@@ -54,15 +54,19 @@ class CircuitTarget(_Target):
             "pumpe_ist": d.get("pump_on"),
             "wuerde_schalten": d.get("would_switch"),
             "ist_temperatur": d.get("current"),
+            "anlage": self.coordinator.entry.title,
         }
 
 
 class RoomTarget(_Target):
-    def _data(self) -> dict:
+    def _circuit(self) -> dict:
         for circuit in ((self.coordinator.data or {}).get("circuits") or {}).values():
             if self._sid in circuit.get("rooms", {}):
-                return circuit["rooms"][self._sid]
+                return circuit
         return {}
+
+    def _data(self) -> dict:
+        return self._circuit().get("rooms", {}).get(self._sid, {})
 
     @property
     def native_value(self):
@@ -73,7 +77,8 @@ class RoomTarget(_Target):
         d = self._data()
         return {"modus": d.get("mode"), "trv_sollwert": d.get("setpoint"), "ist_temperatur": d.get("current"),
                 "waermebedarf": d.get("heat_demand"), "problem": d.get("problem"),
-                "ventile_offen": d.get("valves_open"), "ventile_soll": d.get("valves_wanted")}
+                "ventile_offen": d.get("valves_open"), "ventile_soll": d.get("valves_wanted"),
+                "heizkreis": self._circuit().get("name")}
 
 
 def _find(coordinator, sid: str, circuit: bool) -> dict:
