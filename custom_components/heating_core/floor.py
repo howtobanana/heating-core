@@ -6,6 +6,7 @@ Regeln (Fabian, 08.11.2026, plus Hydraulik-Grundregeln):
 - Je Zone öffnen alle Kanäle gemeinsam (Gleichlauf, z. B. Wohnzimmer UG = Kanal 2+3).
 - Zone öffnet unter Soll − Hysterese, schließt bei Soll erreicht; dazwischen bleibt sie.
 - Zone ohne Temperatursensor: Kanäle werden nicht angefasst (None), Problem „sensor_missing“.
+- None heißt immer „Kanäle dieser Zone diesmal nicht schalten“.
 - Pumpe erst an, wenn die Ventile einer offenen Zone mindestens `valve_delay_s` offen sind.
 - Abschalten: erst die Pumpe aus; Ventile schließen erst, wenn die Pumpe aus ist.
 """
@@ -22,6 +23,7 @@ class Zone:
     target: float
     open_now: bool  # alle Kanäle der Zone sind an
     open_since: float | None  # seit wann offen (Sekunden), None wenn zu
+    any_open: bool = False  # mindestens ein Kanal der Zone ist an (Gleichlauf noch nicht hergestellt)
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,10 @@ def plan(
     pump = source_ok and bool(demand) and ready
 
     if pump_on and not pump:
-        # Pumpe läuft noch: diesmal nur die Pumpe aus, Ventile bleiben, wie sie sind.
-        wanted = {z.key: (z.open_now if wanted[z.key] is False else wanted[z.key]) for z in zones}
+        # Pumpe läuft noch: diesmal nur die Pumpe aus. Zonen, die schließen wollen und noch
+        # (ganz oder halb) offen sind, werden nicht angefasst (None) – auch nicht „angeglichen“.
+        wanted = {
+            z.key: (None if wanted[z.key] is False and (z.open_now or z.any_open) else wanted[z.key])
+            for z in zones
+        }
     return FloorPlan(source_ok=source_ok, zones=wanted, pump=pump, problems=problems)

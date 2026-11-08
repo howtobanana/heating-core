@@ -364,7 +364,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 has_demand_source=bool(rcfg.get(F_SCHEDULE) or rcfg.get(F_PRESENCE)),
                 window_open_too_long=win.open_too_long,
             ))
-            zones.append(Zone(rid, temp, target, open_now, open_since))
+            zones.append(Zone(rid, temp, target, open_now, open_since, any(r.state == "on" for r in readings)))
             out["rooms"][rid] = {"name": rcfg[F_NAME], "target": target, "current": temp, "valves_open": open_now,
                                  "presence": presence_on}
 

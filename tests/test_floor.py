@@ -51,7 +51,7 @@ def test_zone_oeffnet_erst_unter_hysterese():
 def test_abschalten_erst_pumpe_dann_ventile():
     warm = zone(temp=22.5, open_now=True, open_for=3600)
     p = plan([warm], now=NOW, source_temp=60, pump_on=True)
-    assert (p.pump, p.zones[WOHN]) == (False, True)  # Pumpe aus, Ventile noch offen
+    assert (p.pump, p.zones[WOHN]) == (False, None)  # Pumpe aus, Ventile nicht anfassen
     p = plan([warm], now=NOW, source_temp=60, pump_on=False)
     assert p.zones[WOHN] is False  # danach Ventile zu
 
@@ -68,3 +68,10 @@ def test_pumpe_laeuft_fuer_andere_zone_weiter():
     p = plan([warm, kalt], now=NOW, source_temp=60, pump_on=True)
     assert p.pump is True
     assert (p.zones[WOHN], p.zones[BAD]) == (False, True)
+
+
+def test_halb_offene_zone_bleibt_bis_pumpe_steht():
+    # Perg 08.11.: Kanal 2 an, Kanal 3 aus, Pumpe an, Raum warm -> erst nur Pumpe aus
+    halb = Zone(WOHN, 22.8, 22.0, False, None, any_open=True)
+    p = plan([halb], now=NOW, source_temp=64, pump_on=True)
+    assert (p.pump, p.zones[WOHN]) == (False, None)  # Kanal 3 wird dabei NICHT eingeschaltet
