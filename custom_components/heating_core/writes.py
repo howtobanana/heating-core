@@ -28,6 +28,7 @@ class WriteConfig:
     hold_raise_after_drop_s: float = 10 * 60
     confirm_delay_s: float = 30 * 60  # so lange meldet die Anlage einen Write evtl. noch nicht
     significant_drop: float = 1.5
+    budget_limited: bool = True  # False: kein Schreib-Budget (z. B. Ökofen)
 
     @property
     def budget(self) -> int:
@@ -72,7 +73,7 @@ def decide(
 
     delta = target - set_now
     kind = "raise" if delta > 0.1 else "drop" if delta < -0.1 else "sync"
-    budget_ok = len(recent(writes, now)) < cfg.budget
+    budget_ok = not cfg.budget_limited or len(recent(writes, now)) < cfg.budget
 
     if forced_min and abs(delta) > 0.5:
         return Decision(True, kind, "forced_min")  # Sicherheit geht vor Budget

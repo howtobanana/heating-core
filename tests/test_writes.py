@@ -91,3 +91,13 @@ def test_erneuern_vaillant2():
 def test_budget_grenzen():
     assert WriteConfig(budget_per_hour=2).budget == 5
     assert WriteConfig(budget_per_hour=50).budget == 20
+
+
+def test_ohne_budget_bei_oekofen():
+    """Ökofen hat kein Schreib-Budget (Fabian, 09.11.2026): auch nach vielen Writes wird geschrieben."""
+    from custom_components.heating_core.writes import Write, WriteConfig, decide
+    writes = [Write(1000 + i, 20 + i % 2, "drop") for i in range(30)]
+    cfg = WriteConfig(budget_limited=False)
+    d = decide(now=1100, target=17.0, set_now=20.0, writes=writes, cfg=cfg)
+    assert d.write and d.reason != "budget"
+    assert decide(now=1100, target=17.0, set_now=20.0, writes=writes, cfg=WriteConfig()).reason == "budget"

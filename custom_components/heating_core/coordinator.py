@@ -385,7 +385,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             target=m_res.target,
             set_now=state.setpoint,
             writes=writes,
-            cfg=WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET)), hysteresis=g.hysteresis, confirm_delay_s=lim.confirm_delay_s),
+            cfg=WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET)), hysteresis=g.hysteresis, confirm_delay_s=lim.confirm_delay_s,
+                            budget_limited=lim.write_budget),
             forced_min=m_res.forced_min,
             away=g.away_effective,
             renew_due=state.renew_due,
@@ -396,7 +397,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dec = Decision(False, "none", "circuit_off")
             out["mode"] = "circuit_off"
         out["decision"] = dec.reason
-        out["budget_left"] = max(0, WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget - len([w for w in writes if now - w.ts < 3600]))
+        out["budget_left"] = (max(0, WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget - len([w for w in writes if now - w.ts < 3600]))
+                              if lim.write_budget else None)
         out["would_write"] = dec.write
         # Variante B: läuft die Anlage noch im eigenen Zeitprogramm, einmal übernehmen
         takeover = getattr(self.adapter, "needs_takeover", None)

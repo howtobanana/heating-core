@@ -103,7 +103,8 @@ class OekofenAdapter:
             min_temp=_float(attrs.get("min_temp")) or 7.0,
             max_temp=_float(attrs.get("max_temp")) or 35.0,
             confirm_delay_s=10 * 60,
-            modulating=True,  # Pellematic-Heizkurve mit Raumeinfluss regelt, Heating Core hält den Sollwert
+            modulating=True,
+            write_budget=False,  # lokale Pellematic-Schnittstelle, kein API-Limit (Fabian, 09.11.2026)  # Pellematic-Heizkurve mit Raumeinfluss regelt, Heating Core hält den Sollwert
         )
 
     async def write_setpoint(self, master_entity: str, value: float) -> None:
