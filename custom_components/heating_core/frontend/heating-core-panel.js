@@ -265,7 +265,7 @@ class HeatingCorePanel extends HTMLElement {
     const clip = `hc-tank-${(this._clipN = (this._clipN || 0) + 1)}`;
     const ly = p === null ? 0 : boiler.y + boiler.h * (1 - Math.max(0, Math.min(1, p)));
     const tank = p === null ? "" : `<clipPath id="${clip}"><rect x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/></clipPath>
-      <g clip-path="url(#${clip})" class="lvl ${level}"><rect x="${boiler.x}" y="${ly}" width="${boiler.w}" height="${boiler.y + boiler.h - ly}"/><path d="M${boiler.x} ${ly}H${boiler.x + boiler.w}"/></g>`;
+      <g clip-path="url(#${clip})" class="lvl"><rect x="${boiler.x}" y="${ly}" width="${boiler.w}" height="${boiler.y + boiler.h - ly}"/><path d="M${boiler.x} ${ly}H${boiler.x + boiler.w}"/></g>`;
     const pellets = has(kg) ? `<text class="pel ${level} ${narrow ? "end" : "mid"}" x="${narrow ? boiler.x + boiler.w - 16 : bx}" y="${narrow ? boiler.y + 40 : boiler.y + 98}">${Math.round(Number(kg)).toLocaleString("de-AT")} kg</text>` : "";
     s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
       <text class="s ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 24 : boiler.y + 34}">${fuel ? "Pelletkessel" : "Wärmeerzeuger"}</text>
@@ -414,8 +414,7 @@ const CSS = `
   .schema { display:block; width: 100%; height: auto; } .schema.wide { max-width: 980px; margin: 0 auto; }
   .schema .box { fill: var(--card-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
   .schema .box.hot { stroke: ${HOT}; } .schema .box.warnbox { stroke: ${WARN}; stroke-dasharray: 4 3; }
-  .schema .lvl rect { fill: currentColor; opacity: .12; } .schema .lvl path { stroke: currentColor; stroke-width: 2; opacity: .8; }
-  .schema .lvl { color: var(--secondary-text-color); } .schema .lvl.lv-ok { color: #43a047; } .schema .lvl.lv-mid { color: ${WARN}; } .schema .lvl.lv-low { color: #e53935; }
+  .schema .lvl rect { fill: ${HOT}; opacity: .14; } .schema .lvl path { stroke: ${HOT}66; stroke-width: 1.5; }
   .schema .pel { font-size: 15px; font-weight: 600; fill: var(--primary-text-color); } .schema .pel.lv-ok { fill: #43a047; } .schema .pel.lv-mid { fill: ${WARN}; } .schema .pel.lv-low { fill: #e53935; }
   .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; }
   .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; } .schema .end { text-anchor: end; }
