@@ -33,6 +33,9 @@ OPT_BOOST_THRESHOLD = "boost_threshold"
 OPT_HUMIDITY_ENABLED = "humidity_enabled"
 OPT_HUMIDITY_DROP = "humidity_drop"
 OPT_PRE_HEAT_TIMEOUT_MIN = "pre_heat_timeout_min"
+OPT_NOTIFY_DEVICES = "notify_devices"
+OPT_PUSH_ENABLED = "push_enabled"
+OPT_QUIET_SCHEDULE = "quiet_schedule"
 
 DEFAULTS = {
     OPT_ECO: 19.0,
@@ -55,6 +58,8 @@ DEFAULTS = {
     OPT_HUMIDITY_ENABLED: False,
     OPT_HUMIDITY_DROP: 0.5,
     OPT_PRE_HEAT_TIMEOUT_MIN: 90,
+    OPT_NOTIFY_DEVICES: [],
+    OPT_PUSH_ENABLED: True,
 }
 
 # Felder in Heizkreis- und Raum-Subentries

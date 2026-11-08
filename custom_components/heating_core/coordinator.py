@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .adapters import get_adapter
+from .notify import Notifier
 from .const import (
     CONF_MANUFACTURER,
     DEFAULTS,
@@ -74,6 +75,14 @@ from .timing import Reading, presence, window
 from .writes import Decision, Write, WriteConfig, decide
 
 _LOGGER = logging.getLogger(__name__)
+TRV_READBACK_S = 5 * 60
+MODE_TEXT = {"eco": "Absenkung", "presence": "Präsenz", "schedule": "Zeitplan", "pre_heat": "Vorheizen", "manual": "Komfort",
+             "boost": "Boost", "away": "Abwesend", "window": "Fenster offen", "temperature_drop": "Temperatursturz",
+             "summer": "Sommer", "circuit_off": "Kreis aus"}
+
+
+def _de(v) -> str:
+    return "–" if v is None else f"{float(v):.1f}".replace(".", ",")
 
 
 def _float(value: Any) -> float | None:
@@ -96,6 +105,7 @@ class ControlState:
     source_ok: dict[str, bool] = field(default_factory=dict)  # Fußbodenkreis -> Kessel freigegeben
     comfort: dict[str, float] = field(default_factory=dict)  # Regler „Komfort“ je Kreis/Raum
     setback: dict[str, float] = field(default_factory=dict)  # Regler „Absenkung“ je Kreis/Raum
+    trv_writes: dict[str, tuple[float, float]] = field(default_factory=dict)  # TRV -> (Zeit, geschriebener Sollwert)
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
 
@@ -115,6 +125,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.control = ControlState()
         self.adapter = get_adapter(hass, entry.data.get(CONF_MANUFACTURER, ""))
         self._started = time.time()
+        self.notifier = Notifier(hass, entry)
+        self._events: list[str] = []
         self._unsub = None
 
     # ---- Konfiguration -----------------------------------------------------
@@ -266,12 +278,17 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now = time.time()
         g = self.globals()
         result: dict[str, Any] = {"globals": g, "circuits": {}}
+        self._events = []
         for cid, ccfg in self.circuits().items():
             result["circuits"][cid] = await self._circuit(cid, ccfg, g, now)
         # Brennstoff (nur Ökofen): aus dem ersten Heizkreis mit Master abgeleitet
         fuel = getattr(self.adapter, "fuel", None)
         masters = [c[F_MASTER] for c in self.circuits().values() if c.get(F_MASTER)]
         result["fuel_kg"], result["fuel_max_kg"] = fuel(masters[0]) if fuel and masters else (None, None)
+        try:
+            await self.notifier.update(result, self._events, ready=now - self._started >= STARTUP_GUARD_S)
+        except (HomeAssistantError, ValueError) as err:  # Meldungen dürfen die Regelung nie stoppen
+            _LOGGER.warning("Benachrichtigung fehlgeschlagen: %s", err)
         return result
 
     async def _circuit(self, cid: str, ccfg: dict, g: Globals, now: float) -> dict[str, Any]:
@@ -298,6 +315,13 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": r_res.mode, "target": r_res.target, "entity": rcfg[F_CLIMATE],
                                  "setpoint": r_in.current_setpoint, "presence": r_in.presence_on, "current": r_in.current_temp,
                                  "heat_demand": r_res.needs_heat}
+            # Rücklesen: 5 min nach dem Schreiben muss der TRV den Sollwert zeigen (Blueprint „TRV Write Failed“)
+            sent = self.control.trv_writes.get(rcfg[F_CLIMATE])
+            if sent and now - sent[0] >= TRV_READBACK_S:
+                if abs(r_in.current_setpoint - sent[1]) <= 0.5:
+                    self.control.trv_writes.pop(rcfg[F_CLIMATE])
+                else:
+                    out["rooms"][rid]["problem"] = "room_write_failed"
 
         if not state.available:
             # Master weg (z. B. Cloud aus): Räume mit TRV trotzdem regeln – Fenster-/Sommer-Minimum (HEATING-17)
@@ -348,7 +372,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             humidity_drop=float(self.opt(OPT_HUMIDITY_DROP)),
         )
         m_res = master_target(g, m_in, isolated)
-        out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence,
+        out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence, window_open=win.open_too_long,
                    current=current, budget_left=None, mode=_circuit_mode(m_res, m_in, g))
 
         for rid, rcfg in followers:
@@ -379,6 +403,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         takeover = bool(takeover and takeover(master_entity)) and not state.heating_off and now - self._started >= STARTUP_GUARD_S
         if (dec.write or takeover) and self.control.write_enabled:
             await self.adapter.write_setpoint(master_entity, m_res.target)
+            self._events.append(f"{ccfg[F_NAME]}: {_de(state.setpoint)} → {_de(m_res.target)} °C ({MODE_TEXT.get(out['mode'], out['mode'])})")
             writes.append(Write(now, m_res.target, dec.kind))
             del writes[:-20]
 
@@ -397,6 +422,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.hass.services.async_call(
                     "climate", "set_temperature", {"entity_id": room["entity"], "temperature": tgt}, blocking=True
                 )
+                self.control.trv_writes[room["entity"]] = (now, tgt)
             except (HomeAssistantError, ValueError) as err:
                 _LOGGER.warning("Thermostat %s: Sollwert %s nicht geschrieben: %s", room["entity"], tgt, err)
                 room["problem"] = "room_write_failed"
@@ -471,6 +497,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.hass.services.async_call(
                     "switch", "turn_on" if on else "turn_off", {"entity_id": entity_id}, blocking=True
                 )
+            self._events.append(f"{ccfg[F_NAME]}: " + ", ".join(f"{e.split('.')[-1]} {'an' if on else 'aus'}" for e, on in switches))
         return out
 
     def _room_input(self, rid: str, rcfg: dict, now: float) -> RoomInput | None:

@@ -59,6 +59,9 @@ from .const import (
     OPT_MIN_TRV,
     OPT_OUTDOOR_SENSOR,
     OPT_PRE_HEAT_TIMEOUT_MIN,
+    OPT_NOTIFY_DEVICES,
+    OPT_PUSH_ENABLED,
+    OPT_QUIET_SCHEDULE,
     OPT_SUMMER_ENTITY,
     OPT_WEATHER_ENABLED,
     OPT_WEATHER_ZONE1,
@@ -153,6 +156,12 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Required(OPT_BOOST_THRESHOLD, default=o[OPT_BOOST_THRESHOLD]): _temp(0.5, 3),
                 vol.Required(OPT_HUMIDITY_ENABLED, default=o[OPT_HUMIDITY_ENABLED]): bool,
                 vol.Required(OPT_HUMIDITY_DROP, default=o[OPT_HUMIDITY_DROP]): _temp(0.5, 2),
+                # Benachrichtigungen (HEATING-15): Push an Mobile-App-Geräte, still im Ruhezeit-Zeitplan
+                vol.Required(OPT_PUSH_ENABLED, default=o[OPT_PUSH_ENABLED]): bool,
+                vol.Optional(OPT_NOTIFY_DEVICES, default=o[OPT_NOTIFY_DEVICES]): sel.DeviceSelector(
+                    sel.DeviceSelectorConfig(integration="mobile_app", multiple=True)
+                ),
+                _opt(OPT_QUIET_SCHEDULE, o): _entity("schedule"),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

@@ -40,7 +40,10 @@
           "boost_threshold": "Boost ab Abstand",
           "humidity_enabled": "Feuchte-Kompensation",
           "humidity_drop": "Absenkung je 10 % über 60 %",
-          "pre_heat_timeout_min": "Vorheizen höchstens (min)"
+          "pre_heat_timeout_min": "Vorheizen höchstens (min)",
+          "push_enabled": "Push aufs Handy",
+          "notify_devices": "Handys (Mobile App)",
+          "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)"
         }
       }
     }
