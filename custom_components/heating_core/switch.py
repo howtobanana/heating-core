@@ -7,13 +7,20 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
+import time
+
+from .const import SUB_CIRCUIT, SUB_ROOM
 from .entity import HeatingEntity
 
 KEYS = ("away", "guest", "write_enabled")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
-    async_add_entities(ControlSwitch(entry.runtime_data, key) for key in KEYS)
+    coordinator = entry.runtime_data
+    async_add_entities(ControlSwitch(coordinator, key) for key in KEYS)
+    for sid, sub in entry.subentries.items():
+        if sub.subentry_type == SUB_CIRCUIT or (sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower"):
+            async_add_entities([PreHeatSwitch(coordinator, sid, sub.title)], config_subentry_id=sid)
 
 
 class ControlSwitch(HeatingEntity, SwitchEntity, RestoreEntity):
@@ -42,3 +49,25 @@ class ControlSwitch(HeatingEntity, SwitchEntity, RestoreEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         await self._set(False)
+
+
+class PreHeatSwitch(HeatingEntity, SwitchEntity):
+    """Vorheizen auf Komfort; geht von selbst aus (Präsenz, Zeitplan oder Zeitlimit)."""
+
+    _attr_translation_key = "pre_heat"
+
+    def __init__(self, coordinator, sid: str, title: str) -> None:
+        super().__init__(coordinator, f"{sid}_pre_heat", sid, title)
+        self._sid = sid
+
+    @property
+    def is_on(self) -> bool:
+        return self._sid in self.coordinator.control.pre_heat
+
+    async def async_turn_on(self, **kwargs) -> None:
+        self.coordinator.control.pre_heat[self._sid] = time.time()
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        self.coordinator.control.pre_heat.pop(self._sid, None)
+        await self.coordinator.async_request_refresh()

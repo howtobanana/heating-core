@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from .coordinator import HeatingCoordinator
 
-PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
 type HeatingConfigEntry = ConfigEntry[HeatingCoordinator]
 

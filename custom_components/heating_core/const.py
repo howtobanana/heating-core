@@ -32,6 +32,7 @@ OPT_BOOST_AMOUNT = "boost_amount"
 OPT_BOOST_THRESHOLD = "boost_threshold"
 OPT_HUMIDITY_ENABLED = "humidity_enabled"
 OPT_HUMIDITY_DROP = "humidity_drop"
+OPT_PRE_HEAT_TIMEOUT_MIN = "pre_heat_timeout_min"
 
 DEFAULTS = {
     OPT_ECO: 19.0,
@@ -53,6 +54,7 @@ DEFAULTS = {
     OPT_BOOST_THRESHOLD: 1.0,
     OPT_HUMIDITY_ENABLED: False,
     OPT_HUMIDITY_DROP: 0.5,
+    OPT_PRE_HEAT_TIMEOUT_MIN: 90,
 }
 
 # Felder in Heizkreis- und Raum-Subentries
@@ -73,3 +75,5 @@ F_HUMIDITY = "humidity_sensor"
 
 STARTUP_GUARD_S = 120
 UPDATE_INTERVAL_S = 180
+
+MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable"]

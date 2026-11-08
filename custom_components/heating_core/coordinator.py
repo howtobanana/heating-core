@@ -46,6 +46,7 @@ from .const import (
     OPT_HYSTERESIS,
     OPT_MIN_TRV,
     OPT_OUTDOOR_SENSOR,
+    OPT_PRE_HEAT_TIMEOUT_MIN,
     OPT_SUMMER_ENTITY,
     OPT_WEATHER_ENABLED,
     OPT_WEATHER_ZONE1,
@@ -81,6 +82,7 @@ class ControlState:
     write_enabled: bool = False  # Schattenbetrieb, bis jemand bewusst einschaltet
     writes: dict[str, list[Write]] = field(default_factory=dict)
     presence: dict[str, bool] = field(default_factory=dict)
+    pre_heat: dict[str, float] = field(default_factory=dict)  # Subentry -> Start (Sekunden)
 
 
 class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -188,6 +190,16 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             settle_s=float(self.opt(OPT_WINDOW_SETTLE_S)),
         )
 
+    def _pre_heat(self, sid: str, now: float, took_over: bool) -> bool:
+        """Vorheizen ist aktiv bis Präsenz/Zeitplan übernimmt oder das Zeitlimit abläuft."""
+        start = self.control.pre_heat.get(sid)
+        if start is None:
+            return False
+        if took_over or now - start >= float(self.opt(OPT_PRE_HEAT_TIMEOUT_MIN)) * 60:
+            del self.control.pre_heat[sid]
+            return False
+        return True
+
     def _comfort(self, cfg: dict) -> float:
         return self._num(cfg.get(F_COMFORT_ENTITY)) or float(cfg.get(F_COMFORT, 20.0))
 
@@ -228,11 +240,13 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
             r_in = self._room_input(rid, rcfg, now)
             if r_in is None:
-                out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": "unavailable", "target": None}
+                out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": "unavailable", "target": None, "problem": "room_unavailable"}
                 continue
             r_res = room_target(g, r_in)
             isolated.append((r_in, r_res))
-            out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": r_res.mode, "target": r_res.target, "entity": rcfg[F_CLIMATE], "setpoint": r_in.current_setpoint}
+            out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": r_res.mode, "target": r_res.target, "entity": rcfg[F_CLIMATE],
+                                 "setpoint": r_in.current_setpoint, "presence": r_in.presence_on, "current": r_in.current_temp,
+                                 "heat_demand": r_res.needs_heat}
 
         lim = self.adapter.limits(master_entity)
         win = self._window(ccfg.get(F_WINDOW), now)
@@ -246,12 +260,15 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Keine Ist-Temperatur: nicht raten, nichts schreiben.
             out["problem"] = "temperature_unknown"
             return out
+        m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
+        m_schedule = self._on(ccfg.get(F_SCHEDULE))
         m_in = MasterInput(
             comfort=self._comfort(ccfg),
             current_temp=current,
             set_now=state.setpoint or 0.0,
-            schedule_on=self._on(ccfg.get(F_SCHEDULE)),
-            presence_on=self._presence(cid, ccfg.get(F_PRESENCE) or [], now),
+            schedule_on=m_schedule,
+            presence_on=m_presence,
+            pre_heat_on=self._pre_heat(cid, now, m_presence or m_schedule),
             has_demand_source=bool(ccfg.get(F_SCHEDULE) or ccfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             any_window_open=any_window,
@@ -272,7 +289,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             humidity_drop=float(self.opt(OPT_HUMIDITY_DROP)),
         )
         m_res = master_target(g, m_in, isolated)
-        out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint)
+        out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence,
+                   current=current, budget_left=None, mode=_circuit_mode(m_res, m_in, g))
 
         for rid, rcfg in followers:
             t = follower_target(g, m_res.target_before_mods, float(rcfg.get(F_OFFSET, -2.0)), self._window(rcfg.get(F_WINDOW), now).open_too_long)
@@ -291,6 +309,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             startup_done=now - self._started >= STARTUP_GUARD_S,
         )
         out["decision"] = dec.reason
+        out["budget_left"] = max(0, WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget - len([w for w in writes if now - w.ts < 3600]))
         out["would_write"] = dec.write
         if dec.write and self.control.write_enabled:
             await self.adapter.write_setpoint(master_entity, m_res.target)
@@ -315,13 +334,39 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if current is None:
             return None
         win = self._window(rcfg.get(F_WINDOW), now)
+        r_presence = self._presence(rid, rcfg.get(F_PRESENCE) or [], now)
+        r_schedule = self._on(rcfg.get(F_SCHEDULE))
         return RoomInput(
             comfort=self._comfort(rcfg),
             current_temp=current,
             current_setpoint=_float(st.attributes.get("temperature")) or 0.0,
-            schedule_on=self._on(rcfg.get(F_SCHEDULE)),
-            presence_on=self._presence(rid, rcfg.get(F_PRESENCE) or [], now),
+            schedule_on=r_schedule,
+            presence_on=r_presence,
+            pre_heat_on=self._pre_heat(rid, now, r_presence or r_schedule),
             has_demand_source=bool(rcfg.get(F_SCHEDULE) or rcfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             window_closed_recently=win.closed_recently,
         )
+
+
+def _circuit_mode(res, m_in: MasterInput, g: Globals) -> str:
+    """Verständlicher Modus des Heizkreises für Anzeige und Oberfläche."""
+    if g.summer:
+        return "summer"
+    if m_in.window_open_too_long:
+        return "window"
+    if res.forced_min:
+        return "temperature_drop"
+    if g.away_effective and not m_in.pre_heat_on:
+        return "away"
+    if res.boost_active:
+        return "boost"
+    if m_in.pre_heat_on:
+        return "pre_heat"
+    if m_in.schedule_on:
+        return "schedule"
+    if m_in.presence_on:
+        return "presence"
+    if not m_in.has_demand_source:
+        return "manual"
+    return "eco"

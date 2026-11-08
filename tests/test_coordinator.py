@@ -88,3 +88,29 @@ async def test_master_ohne_temperatur_schreibt_nicht(hass: HomeAssistant, states
     await _setup(hass, _entry())
     kreis = _sensor(hass, "kreis")
     assert kreis.attributes["problem"] == "temperature_unknown"
+
+
+async def test_modus_und_praesenz_sichtbar(hass: HomeAssistant, states) -> None:
+    await _setup(hass, _entry())
+    assert hass.states.get("sensor.kreis_mode").state == "presence"
+    assert hass.states.get("binary_sensor.kreis_presence").state == "on"
+    assert hass.states.get("binary_sensor.test_problem").state == "off"
+
+
+async def test_vorheizen_ohne_praesenz(hass: HomeAssistant, states) -> None:
+    hass.states.async_set(PRESENCE, "off")
+    coordinator = await _setup(hass, _entry())
+    assert float(_sensor(hass, "kreis_setpoint").state) == 19.0
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.kreis_pre_heat"}, blocking=True)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert float(_sensor(hass, "kreis_setpoint").state) == 22.0
+    assert hass.states.get("sensor.kreis_mode").state == "pre_heat"
+
+
+async def test_problem_melder(hass: HomeAssistant, states) -> None:
+    hass.states.async_set(ZONE, "heat_cool", {"temperature": 19})
+    await _setup(hass, _entry())
+    problem = hass.states.get("binary_sensor.test_problem")
+    assert problem.state == "on"
+    assert "temperature_unknown" in problem.attributes["probleme"][0]

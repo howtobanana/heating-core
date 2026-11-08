@@ -39,7 +39,8 @@
           "boost_amount": "Boost-Höhe",
           "boost_threshold": "Boost ab Abstand",
           "humidity_enabled": "Feuchte-Kompensation",
-          "humidity_drop": "Absenkung je 10 % über 60 %"
+          "humidity_drop": "Absenkung je 10 % über 60 %",
+          "pre_heat_timeout_min": "Vorheizen höchstens (min)"
         }
       }
     }
@@ -161,11 +162,39 @@
       },
       "write_enabled": {
         "name": "Schreiben aktiv"
+      },
+      "pre_heat": {
+        "name": "Vorheizen"
       }
     },
     "sensor": {
       "target": {
         "name": "Sollwert"
+      },
+      "mode": {
+        "name": "Modus",
+        "state": {
+          "eco": "Eco",
+          "presence": "Präsenz",
+          "schedule": "Zeitplan",
+          "pre_heat": "Vorheizen",
+          "manual": "Manuell (immer Komfort)",
+          "boost": "Boost",
+          "away": "Abwesend",
+          "window": "Fenster offen",
+          "temperature_drop": "Temperatursturz",
+          "summer": "Sommer (Heizung aus)",
+          "follower": "Folgt dem Master",
+          "unavailable": "Nicht erreichbar"
+        }
+      }
+    },
+    "binary_sensor": {
+      "presence": {
+        "name": "Präsenz"
+      },
+      "problem": {
+        "name": "Problem"
       }
     }
   }

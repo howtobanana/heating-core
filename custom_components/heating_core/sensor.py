@@ -7,7 +7,7 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import SUB_CIRCUIT, SUB_ROOM
+from .const import MODES, SUB_CIRCUIT, SUB_ROOM
 from .entity import HeatingEntity
 
 
@@ -15,9 +15,9 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     coordinator = entry.runtime_data
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT:
-            async_add_entities([CircuitTarget(coordinator, sid, sub.title)], config_subentry_id=sid)
+            async_add_entities([CircuitTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, True)], config_subentry_id=sid)
         elif sub.subentry_type == SUB_ROOM:
-            async_add_entities([RoomTarget(coordinator, sid, sub.title)], config_subentry_id=sid)
+            async_add_entities([RoomTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, False)], config_subentry_id=sid)
 
 
 class _Target(HeatingEntity, SensorEntity):
@@ -47,6 +47,8 @@ class CircuitTarget(_Target):
             "entscheidung": d.get("decision"),
             "wuerde_schreiben": d.get("would_write"),
             "problem": d.get("problem"),
+            "schreib_budget_rest": d.get("budget_left"),
+            "ist_temperatur": d.get("current"),
         }
 
 
@@ -64,4 +66,32 @@ class RoomTarget(_Target):
     @property
     def extra_state_attributes(self):
         d = self._data()
-        return {"modus": d.get("mode"), "trv_sollwert": d.get("setpoint")}
+        return {"modus": d.get("mode"), "trv_sollwert": d.get("setpoint"), "ist_temperatur": d.get("current"),
+                "waermebedarf": d.get("heat_demand"), "problem": d.get("problem")}
+
+
+def _find(coordinator, sid: str, circuit: bool) -> dict:
+    circuits = (coordinator.data or {}).get("circuits") or {}
+    if circuit:
+        return circuits.get(sid, {})
+    for c in circuits.values():
+        if sid in c.get("rooms", {}):
+            return c["rooms"][sid]
+    return {}
+
+
+class Mode(HeatingEntity, SensorEntity):
+    """Warum der Sollwert so ist: Eco, Präsenz, Zeitplan, Abwesend, Fenster …"""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = MODES
+    _attr_translation_key = "mode"
+
+    def __init__(self, coordinator, sid: str, title: str, circuit: bool) -> None:
+        super().__init__(coordinator, f"{sid}_mode", sid, title)
+        self._sid, self._circuit = sid, circuit
+
+    @property
+    def native_value(self):
+        d = _find(self.coordinator, self._sid, self._circuit)
+        return d.get("mode") if d.get("mode") in MODES else None

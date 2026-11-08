@@ -39,7 +39,8 @@
           "boost_amount": "Boost amount",
           "boost_threshold": "Boost threshold",
           "humidity_enabled": "Humidity compensation",
-          "humidity_drop": "Drop per 10 % above 60 %"
+          "humidity_drop": "Drop per 10 % above 60 %",
+          "pre_heat_timeout_min": "Pre-heat timeout (min)"
         }
       }
     }
@@ -161,11 +162,39 @@
       },
       "write_enabled": {
         "name": "Writing enabled"
+      },
+      "pre_heat": {
+        "name": "Pre-heat"
       }
     },
     "sensor": {
       "target": {
         "name": "Setpoint"
+      },
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "eco": "Eco",
+          "presence": "Presence",
+          "schedule": "Schedule",
+          "pre_heat": "Pre-heat",
+          "manual": "Manual (always comfort)",
+          "boost": "Boost",
+          "away": "Away",
+          "window": "Window open",
+          "temperature_drop": "Temperature drop",
+          "summer": "Summer (heating off)",
+          "follower": "Follows master",
+          "unavailable": "Unavailable"
+        }
+      }
+    },
+    "binary_sensor": {
+      "presence": {
+        "name": "Presence"
+      },
+      "problem": {
+        "name": "Problem"
       }
     }
   }
