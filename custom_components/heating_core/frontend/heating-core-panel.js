@@ -21,6 +21,7 @@ const PROBLEMS = {
   sensor_missing: "Sensor fehlt", temperature_unknown: "Ist-Temperatur unbekannt",
   master_unavailable: "Thermostat/Heizkreis nicht erreichbar", room_unavailable: "Thermostat nicht erreichbar",
   source_temperature_unknown: "Kesseltemperatur unbekannt",
+  room_write_failed: "Thermostat hat den Sollwert nicht angenommen",
 };
 const HEATING = new Set(["presence", "schedule", "pre_heat", "manual", "boost", "floor_heating"]);
 const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable"]);

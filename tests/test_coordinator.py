@@ -134,3 +134,64 @@ async def test_eco_regler(hass: HomeAssistant, states) -> None:
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert float(_sensor(hass, "kreis_setpoint").state) == 18.0
+
+
+async def test_trv_wird_auch_ohne_master_geschrieben(hass: HomeAssistant, states) -> None:
+    """HEATING-17: Master (Cloud) offline -> Raum mit offenem Fenster bekommt trotzdem das Minimum."""
+    window = "binary_sensor.fenster_buero"
+    hass.states.async_set(window, "on")
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
+        options={"eco_temp": 19.0, "min_trv_temp": 8.0, "window_delay_s": 10, "presence_activation_min": 0, "boost_enabled": False},
+        subentries_data=[
+            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0},
+                               subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
+            ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": TRV, "comfort": 21.0, "window": window},
+                               subentry_id="raum1", subentry_type="room", title="Büro", unique_id=None),
+        ],
+    )
+    coordinator = await _setup(hass, entry)
+    hass.states.async_set(ZONE, "unavailable")
+    calls = async_mock_service(hass, "climate", "set_temperature")
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0), \
+         patch("custom_components.heating_core.coordinator.time.time", return_value=__import__("time").time() + 600):
+        coordinator._started = 0
+        await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["kreis1"]["problem"] == "master_unavailable"
+    assert [c.data for c in calls] == [{"entity_id": TRV, "temperature": 8.0}]
+
+
+async def test_trv_fehler_stoppt_andere_raeume_nicht(hass: HomeAssistant, states) -> None:
+    from homeassistant.exceptions import HomeAssistantError
+
+    trv2 = "climate.trv_kueche"
+    hass.states.async_set(trv2, "heat", {"temperature": 15, "current_temperature": 18})
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
+        options={"eco_temp": 19.0, "min_trv_temp": 8.0, "presence_activation_min": 0, "boost_enabled": False},
+        subentries_data=[
+            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0},
+                               subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
+            ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": TRV, "comfort": 25.0},
+                               subentry_id="raum1", subentry_type="room", title="Büro", unique_id=None),
+            ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": trv2, "comfort": 25.0},
+                               subentry_id="raum2", subentry_type="room", title="Küche", unique_id=None),
+        ],
+    )
+    coordinator = await _setup(hass, entry)
+    written = []
+
+    async def handler(call):
+        if call.data["entity_id"] in (TRV, [TRV]):
+            raise HomeAssistantError("Funk weg")
+        written.append(call.data["entity_id"])
+
+    hass.services.async_register("climate", "set_temperature", handler)
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
+        coordinator._started = 0
+        await coordinator.async_refresh()
+    rooms = coordinator.data["circuits"]["kreis1"]["rooms"]
+    assert rooms["raum1"]["problem"] == "room_write_failed"
+    assert trv2 in written or [trv2] in written

@@ -10,6 +10,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -280,9 +281,6 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         state = self.adapter.read(master_entity)
         g_all, g = g, replace(g, eco=self.setback(cid, g.eco))
         out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": state.available}
-        if not state.available:
-            out["problem"] = "master_unavailable"
-            return out
 
         isolated: list[tuple[RoomInput, Any]] = []
         followers: list[tuple[str, dict]] = []
@@ -301,6 +299,12 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                  "setpoint": r_in.current_setpoint, "presence": r_in.presence_on, "current": r_in.current_temp,
                                  "heat_demand": r_res.needs_heat}
 
+        if not state.available:
+            # Master weg (z. B. Cloud aus): Räume mit TRV trotzdem regeln – Fenster-/Sommer-Minimum (HEATING-17)
+            out["problem"] = "master_unavailable"
+            await self._write_rooms(out, g, now)
+            return out
+
         lim = self.adapter.limits(master_entity)
         win = self._window(ccfg.get(F_WINDOW), now)
         any_window = any(
@@ -310,8 +314,9 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if current is None:
             current = state.current
         if current is None:
-            # Keine Ist-Temperatur: nicht raten, nichts schreiben.
+            # Keine Ist-Temperatur am Master: dort nicht raten, die Räume aber weiter regeln.
             out["problem"] = "temperature_unknown"
+            await self._write_rooms(out, g, now)
             return out
         m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
         m_schedule = self._on(ccfg.get(F_SCHEDULE))
@@ -377,14 +382,24 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             writes.append(Write(now, m_res.target, dec.kind))
             del writes[:-20]
 
-        if self.control.write_enabled and now - self._started >= STARTUP_GUARD_S:
-            for room in out["rooms"].values():
-                tgt, cur = room.get("target"), room.get("setpoint")
-                if tgt is not None and (cur is None or abs(tgt - cur) > g.hysteresis):
-                    await self.hass.services.async_call(
-                        "climate", "set_temperature", {"entity_id": room["entity"], "temperature": tgt}, blocking=True
-                    )
+        await self._write_rooms(out, g, now)
         return out
+
+    async def _write_rooms(self, out: dict[str, Any], g: Globals, now: float) -> None:
+        """TRV-Sollwerte schreiben; ein Fehler bei einem Raum stoppt die anderen nicht."""
+        if not self.control.write_enabled or now - self._started < STARTUP_GUARD_S:
+            return
+        for room in out["rooms"].values():
+            tgt, cur = room.get("target"), room.get("setpoint")
+            if tgt is None or room.get("entity") is None or (cur is not None and abs(tgt - cur) <= g.hysteresis):
+                continue
+            try:
+                await self.hass.services.async_call(
+                    "climate", "set_temperature", {"entity_id": room["entity"], "temperature": tgt}, blocking=True
+                )
+            except (HomeAssistantError, ValueError) as err:
+                _LOGGER.warning("Thermostat %s: Sollwert %s nicht geschrieben: %s", room["entity"], tgt, err)
+                room["problem"] = "room_write_failed"
 
     async def _floor_circuit(self, cid: str, ccfg: dict, g: Globals, now: float) -> dict[str, Any]:
         """Fußboden mit eigener Pumpe und Ventil-Kanälen (Sonderfall Perg)."""
