@@ -198,9 +198,9 @@ class HeatingCorePanel extends HTMLElement {
     const kessel = info.find((i) => i.floor)?.t.kessel_temperatur;
     const W = narrow ? 360 : 820;
     const L = narrow
-      ? { man: [12, 40], pump: 62, box: [84, 344], room: [130, 344], branch: 106, valve: 118, step: 52 }
-      : { man: [170, 196], pump: 229, box: [262, 470], room: [560, 804], branch: 500, valve: 530, step: 56 };
-    let y = narrow ? 104 : 8;
+      ? { kessel: [12, 84], pump: 102, box: [122, 344], room: [158, 344], branch: 138, valve: 148, step: 52 }
+      : { kessel: [16, 136], pump: 199, box: [262, 470], room: [560, 804], branch: 500, valve: 530, step: 56 };
+    let y = narrow ? 18 : 8;
     const rows = info.map((i) => {
       const n = i.rooms.length;
       let cy, rooms;
@@ -218,7 +218,8 @@ class HeatingCorePanel extends HTMLElement {
     });
     const top = rows[0].cy, bottom = rows[rows.length - 1].cy;
     const any = rows.some((r) => r.flow);
-    const boiler = narrow ? { x: 12, y: 12, w: 336, h: 64 } : { x: 16, y: Math.max(8, (top + bottom) / 2 - 60), w: 136, h: 120 };
+    // Kessel so hoch wie alle Heizkreise: jeder Kreis bekommt eine gerade Doppelleitung, nichts kreuzt sich
+    const boiler = { x: L.kessel[0], y: top - 34, w: L.kessel[1] - L.kessel[0], h: bottom - top + 68 };
     const H = Math.max(y, boiler.y + boiler.h) + 8;
     // Rohr: durchgehende Leitung, bei Fluss mit laufender Strichlinie darüber – Enden sitzen immer sauber an der Kante
     const pipe = (on, back, color, d, thin) => {
@@ -227,19 +228,13 @@ class HeatingCorePanel extends HTMLElement {
         ? `<path class="pipe base ${t}" style="stroke:${color}" d="${d}"/><path class="pipe flow ${t} ${back ? "back" : ""}" style="stroke:${color}" d="${d}"/>`
         : `<path class="pipe idle ${t}" d="${d}"/>`;
     };
-    // Verteiler: alle Kreise münden in einen Block, so kreuzt sich keine Leitung
-    const [mx, mx2] = L.man;
-    const manTop = narrow ? boiler.y + boiler.h + 12 : Math.min(top - 6, boiler.y + 46) - 16;
-    const manBot = narrow ? bottom + 22 : Math.max(bottom + 6, boiler.y + 74) + 16;
-    let s = narrow
-      ? pipe(any, true, COLD, `M20 ${boiler.y + boiler.h}V${manTop}`) + pipe(any, false, HOT, `M32 ${boiler.y + boiler.h}V${manTop}`)
-      : pipe(any, false, HOT, `M${boiler.x + boiler.w} ${boiler.y + 46}H${mx}`) + pipe(any, true, COLD, `M${boiler.x + boiler.w} ${boiler.y + 74}H${mx}`);
-    for (const r of rows) s += pipe(r.flow, true, COLD, `M${mx2} ${r.cy + 6}H${L.box[0]}`);
-    s += `<rect class="manifold" x="${mx}" y="${manTop}" width="${mx2 - mx}" height="${manBot - manTop}" rx="8"/>`;
+    const kx = boiler.x + boiler.w;
+    let s = "";
+    for (const r of rows) s += pipe(r.flow, true, COLD, `M${kx} ${r.cy + 6}H${L.box[0]}`);
     for (const r of rows) {
       const [bx, bx2] = L.box;
       const sub = r.floor ? `Pumpe ${r.t.pumpe_ist ? "läuft" : "aus"}${r.t.pumpe_soll !== r.t.pumpe_ist && r.t.pumpe_soll != null ? ` · würde ${r.t.pumpe_soll ? "ein" : "aus"}schalten` : ""}` : `${fmt(r.ist)} → ${fmt(r.soll)} °C`;
-      s += pipe(r.flow, false, HOT, `M${mx2} ${r.cy - 6}H${bx}`) + I.pump(L.pump, r.cy - 6, r.flow);
+      s += pipe(r.flow, false, HOT, `M${kx} ${r.cy - 6}H${bx}`) + I.pump(L.pump, r.cy - 6, r.flow);
       s += `<rect class="box ${r.flow ? "hot" : ""} ${r.problem ? "warnbox" : ""}" x="${bx}" y="${r.cy - 24}" width="${bx2 - bx}" height="48" rx="12"/>
         <text class="t" x="${bx + 14}" y="${r.cy - 4}">${esc(r.name)}</text>
         <text class="s" x="${bx + 14}" y="${r.cy + 14}">${esc(sub)}</text>`;
@@ -256,21 +251,19 @@ class HeatingCorePanel extends HTMLElement {
           ${z.problem ? I.warn(rx2 - 16, z.y) : ""}`;
       }
     }
-    const bx = narrow ? boiler.x + 18 : boiler.x + boiler.w / 2;
-    // Pelletlager: Restmenge in kg, Farbe nach Füllstand (Stand / Maximum der Anlage)
+    // Pelletlager: Füllung von unten in der Farbe der Umrandung, Restmenge in kg nach Füllstand eingefärbt
     const kg = fuel?.state, max = fuel?.attributes?.max_kg;
-    const p = has(kg) && has(max) && Number(max) > 0 ? Number(kg) / Number(max) : null;
+    const p = has(kg) && has(max) && Number(max) > 0 ? Math.max(0, Math.min(1, Number(kg) / Number(max))) : null;
     const level = p === null ? "" : p < 0.15 ? "lv-low" : p < 0.35 ? "lv-mid" : "lv-ok";
-    // Füllstandslinie in der Box (wie ein Tank), darunter ein leichter Farbton
     const clip = `hc-tank-${(this._clipN = (this._clipN || 0) + 1)}`;
-    const ly = p === null ? 0 : boiler.y + boiler.h * (1 - Math.max(0, Math.min(1, p)));
+    const ly = p === null ? 0 : boiler.y + boiler.h * (1 - p);
     const tank = p === null ? "" : `<clipPath id="${clip}"><rect x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/></clipPath>
-      <g clip-path="url(#${clip})" class="lvl"><rect x="${boiler.x}" y="${ly}" width="${boiler.w}" height="${boiler.y + boiler.h - ly}"/><path d="M${boiler.x} ${ly}H${boiler.x + boiler.w}"/></g>`;
-    const pellets = has(kg) ? `<text class="pel ${level} ${narrow ? "end" : "mid"}" x="${narrow ? boiler.x + boiler.w - 16 : bx}" y="${narrow ? boiler.y + 40 : boiler.y + 98}">${Math.round(Number(kg)).toLocaleString("de-AT")} kg</text>` : "";
+      <rect class="lvl" clip-path="url(#${clip})" x="${boiler.x}" y="${ly}" width="${boiler.w}" height="${boiler.y + boiler.h - ly}"/>`;
+    const cx = boiler.x + boiler.w / 2, cyB = boiler.y + boiler.h / 2;
     s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
-      <text class="s ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 24 : boiler.y + 34}">${fuel ? "Pelletkessel" : "Wärmeerzeuger"}</text>
-      <text class="big ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 48 : boiler.y + 64}">${has(kessel) ? fmt(kessel, 0) + " °C" : "–"}</text>
-      ${pellets}` + s;
+      <text class="s mid" x="${cx}" y="${cyB - 24}">${narrow ? "Kessel" : fuel ? "Pelletkessel" : "Wärmeerzeuger"}</text>
+      <text class="big mid" x="${cx}" y="${cyB + 4}">${has(kessel) ? fmt(kessel, 0) + " °C" : "–"}</text>
+      ${has(kg) ? `<text class="pel mid ${level} ${narrow ? "sm" : ""}" x="${cx}" y="${cyB + 28}">${Math.round(Number(kg)).toLocaleString("de-AT")} kg</text>` : ""}` + s;
     return `<svg class="schema ${narrow ? "" : "wide"}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Anlagenschema">${s}</svg>`;
   }
 
@@ -414,8 +407,8 @@ const CSS = `
   .schema { display:block; width: 100%; height: auto; } .schema.wide { max-width: 980px; margin: 0 auto; }
   .schema .box { fill: var(--card-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
   .schema .box.hot { stroke: ${HOT}; } .schema .box.warnbox { stroke: ${WARN}; stroke-dasharray: 4 3; }
-  .schema .lvl rect { fill: ${HOT}; opacity: .14; } .schema .lvl path { stroke: ${HOT}66; stroke-width: 1.5; }
-  .schema .pel { font-size: 15px; font-weight: 600; fill: var(--primary-text-color); } .schema .pel.lv-ok { fill: #43a047; } .schema .pel.lv-mid { fill: ${WARN}; } .schema .pel.lv-low { fill: #e53935; }
+  .schema .lvl { fill: ${HOT}; opacity: .16; }
+  .schema .pel.sm { font-size: 13px; } .schema .pel { font-size: 15px; font-weight: 600; fill: var(--primary-text-color); } .schema .pel.lv-ok { fill: #43a047; } .schema .pel.lv-mid { fill: ${WARN}; } .schema .pel.lv-low { fill: #e53935; }
   .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; }
   .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; } .schema .end { text-anchor: end; }
   .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
@@ -423,7 +416,6 @@ const CSS = `
   .schema .big { font-size: 20px; font-weight: 600; fill: var(--primary-text-color); }
   .schema .pipe { fill: none; stroke-width: 3; stroke-linecap: butt; stroke-linejoin: round; } .schema .pipe.thin { stroke-width: 2.2; }
   .schema .pipe.base { opacity: .35; } .schema .pipe.idle { stroke: ${IDLE}; opacity: .5; }
-  .schema .manifold { fill: var(--secondary-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
   .schema .pipe.flow { stroke-dasharray: 7 6; animation: flow 1s linear infinite; } .schema .pipe.flow.back { animation-direction: reverse; }
   @keyframes flow { to { stroke-dashoffset: -13; } }
   @media (prefers-reduced-motion: reduce) { .schema .pipe.flow { animation: none; } }
