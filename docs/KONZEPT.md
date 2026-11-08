@@ -103,8 +103,17 @@ Fußbodenheizung als eigener Ökofen-Heizkreis (Typ Fußboden).
 In Perg ist die Fußbodenheizung nicht offiziell in der Pellematic eingebunden,
 sondern über einen eigenen Controller mit Ventil-Kanälen geregelt
 (`switch.coordinator_fussbodenheizung_l1` … `l4`). Fabian beschreibt den
-Sonderfall gerade; er kommt erst nach dem Ökofen-Standard. Das Datenmodell hält
-dafür FBH-Zonen mit Ventil-Schalter, Raumsensor und Rohrtemperatur-Grenze bereit.
+Sonderfall; er kommt erst nach dem Ökofen-Standard (Details in HEATING-8).
+
+Beschreibung Fabian (08.11.2026): HK1 Heizkörper OG und HK2 Heizkörper UG sind
+Ökofen-Kreise. HK3 Fußboden läuft extern: Kanal 1 = Pumpe (an, wenn Kessel
+`sensor.pellematic_pellematic_1_l_temp_act` > einstellbare Grenze, Standard 50 °C,
+UND ein FBH-Raum unter Soll; künftig über Smart Plug), Kanal 2+3 = Wohnzimmer UG
+(immer gleichlaufend), Kanal 4 = Bad OG.
+
+Das Datenmodell braucht dafür: FBH-Kreis mit eigener Pumpe (Schalter),
+Freigabe über eine Wärmequellen-Temperatur mit Grenze und Hysterese, Zonen mit
+einem oder mehreren Ventil-Kanälen (Gleichlauf-Gruppe je Raum).
 
 ## 5. Entitäten der Integration
 
