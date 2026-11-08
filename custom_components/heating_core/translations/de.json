@@ -224,6 +224,17 @@
       "problem": {
         "name": "Problem"
       }
+    },
+    "number": {
+      "comfort": {
+        "name": "Komfort"
+      },
+      "eco": {
+        "name": "Eco"
+      },
+      "away_temp": {
+        "name": "Abwesend-Temperatur"
+      }
     }
   }
 }

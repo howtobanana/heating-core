@@ -93,6 +93,9 @@ class ControlState:
     presence: dict[str, bool] = field(default_factory=dict)
     pre_heat: dict[str, float] = field(default_factory=dict)  # Subentry -> Start (Sekunden)
     source_ok: dict[str, bool] = field(default_factory=dict)  # Fußbodenkreis -> Kessel freigegeben
+    comfort: dict[str, float] = field(default_factory=dict)  # Regler „Komfort“ je Kreis/Raum
+    eco: float | None = None  # Regler „Eco“ der Anlage
+    away_temp: float | None = None  # Regler „Abwesend“ der Anlage
 
 
 class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -211,13 +214,16 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return False
         return True
 
-    def _comfort(self, cfg: dict) -> float:
+    def _comfort(self, cfg: dict, sid: str | None = None) -> float:
+        """Komfort: eigener Regler > gewählter Helfer > Wert aus dem Formular."""
+        if sid in self.control.comfort:
+            return self.control.comfort[sid]
         return self._num(cfg.get(F_COMFORT_ENTITY)) or float(cfg.get(F_COMFORT, 20.0))
 
     def globals(self) -> Globals:
         return Globals(
-            eco=float(self.opt(OPT_ECO)),
-            away_temp=float(self.opt(OPT_AWAY_TEMP)),
+            eco=self.control.eco if self.control.eco is not None else float(self.opt(OPT_ECO)),
+            away_temp=self.control.away_temp if self.control.away_temp is not None else float(self.opt(OPT_AWAY_TEMP)),
             min_trv=float(self.opt(OPT_MIN_TRV)),
             hysteresis=float(self.opt(OPT_HYSTERESIS)),
             away=self.control.away or any(self._on(e) for e in self.opt(OPT_AWAY_ENTITIES) or []),
@@ -276,7 +282,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
         m_schedule = self._on(ccfg.get(F_SCHEDULE))
         m_in = MasterInput(
-            comfort=self._comfort(ccfg),
+            comfort=self._comfort(ccfg, cid),
             current_temp=current,
             set_now=state.setpoint or 0.0,
             schedule_on=m_schedule,
@@ -358,7 +364,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             presence_on = self._presence(rid, rcfg.get(F_PRESENCE) or [], now)
             schedule_on = self._on(rcfg.get(F_SCHEDULE))
             target, _active = room_base(g, RoomInput(
-                comfort=self._comfort(rcfg), current_temp=temp or 0.0, current_setpoint=0.0,
+                comfort=self._comfort(rcfg, rid), current_temp=temp or 0.0, current_setpoint=0.0,
                 schedule_on=schedule_on, presence_on=presence_on,
                 pre_heat_on=self._pre_heat(rid, now, presence_on or schedule_on),
                 has_demand_source=bool(rcfg.get(F_SCHEDULE) or rcfg.get(F_PRESENCE)),
@@ -425,7 +431,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         r_presence = self._presence(rid, rcfg.get(F_PRESENCE) or [], now)
         r_schedule = self._on(rcfg.get(F_SCHEDULE))
         return RoomInput(
-            comfort=self._comfort(rcfg),
+            comfort=self._comfort(rcfg, rid),
             current_temp=current,
             current_setpoint=_float(st.attributes.get("temperature")) or 0.0,
             schedule_on=r_schedule,

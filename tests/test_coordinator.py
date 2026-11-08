@@ -114,3 +114,21 @@ async def test_problem_melder(hass: HomeAssistant, states) -> None:
     problem = hass.states.get("binary_sensor.test_problem")
     assert problem.state == "on"
     assert "temperature_unknown" in problem.attributes["probleme"][0]
+
+
+async def test_komfort_regler_wirkt_sofort(hass: HomeAssistant, states) -> None:
+    coordinator = await _setup(hass, _entry())
+    assert float(hass.states.get("number.kreis_comfort").state) == 22.0
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.kreis_comfort", "value": 23.5}, blocking=True)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert float(_sensor(hass, "kreis_setpoint").state) == 23.5
+
+
+async def test_eco_regler(hass: HomeAssistant, states) -> None:
+    hass.states.async_set(PRESENCE, "off")
+    coordinator = await _setup(hass, _entry())
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.test_eco", "value": 18.0}, blocking=True)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert float(_sensor(hass, "kreis_setpoint").state) == 18.0
