@@ -198,8 +198,8 @@ class HeatingCorePanel extends HTMLElement {
     const kessel = info.find((i) => i.floor)?.t.kessel_temperatur;
     const W = narrow ? 360 : 820;
     const L = narrow
-      ? { rl: 22, vl: 36, pump: 62, box: [84, 344], room: [130, 344], branch: 106, valve: 118, step: 52 }
-      : { rl: 178, vl: 194, pump: 232, box: [262, 470], room: [560, 804], branch: 500, valve: 530, step: 56 };
+      ? { man: [12, 40], pump: 62, box: [84, 344], room: [130, 344], branch: 106, valve: 118, step: 52 }
+      : { man: [170, 196], pump: 229, box: [262, 470], room: [560, 804], branch: 500, valve: 530, step: 56 };
     let y = narrow ? 104 : 8;
     const rows = info.map((i) => {
       const n = i.rooms.length;
@@ -220,20 +220,26 @@ class HeatingCorePanel extends HTMLElement {
     const any = rows.some((r) => r.flow);
     const boiler = narrow ? { x: 12, y: 12, w: 336, h: 64 } : { x: 16, y: Math.max(8, (top + bottom) / 2 - 60), w: 136, h: 120 };
     const H = Math.max(y, boiler.y + boiler.h) + 8;
-    const pipe = (on, back, color, d, thin) => `<path class="pipe ${thin ? "thin" : ""} ${on ? "flow" : ""} ${back ? "back" : ""}" style="stroke:${on ? color : IDLE}" d="${d}"/>`;
-    const barTop = boiler.y + boiler.h;
-    const rlA = narrow ? barTop : Math.min(top + 6, boiler.y + 74), rlB = narrow ? bottom + 6 : Math.max(bottom + 6, boiler.y + 74);
-    const vlA = narrow ? barTop : Math.min(top - 6, boiler.y + 46), vlB = narrow ? bottom - 6 : Math.max(bottom - 6, boiler.y + 46);
-    // Rücklauf zuerst, Vorlauf mit Halo darüber: so bleiben Kreuzungen sauber lesbar
-    let s = pipe(any, true, COLD, `M${L.rl} ${rlA}V${rlB}`);
-    if (!narrow) s += pipe(any, true, COLD, `M${boiler.x + boiler.w} ${boiler.y + 74}H${L.rl}`);
-    for (const r of rows) s += pipe(r.flow, true, COLD, `M${L.rl} ${r.cy + 6}H${L.box[0]}`);
-    s += `<path class="halo" d="M${L.vl} ${vlA}V${vlB}"/>` + pipe(any, false, HOT, `M${L.vl} ${vlA}V${vlB}`);
-    if (!narrow) s += `<path class="halo" d="M${boiler.x + boiler.w} ${boiler.y + 46}H${L.vl}"/>` + pipe(any, false, HOT, `M${boiler.x + boiler.w} ${boiler.y + 46}H${L.vl}`);
+    // Rohr: durchgehende Leitung, bei Fluss mit laufender Strichlinie darüber – Enden sitzen immer sauber an der Kante
+    const pipe = (on, back, color, d, thin) => {
+      const t = thin ? "thin" : "";
+      return on
+        ? `<path class="pipe base ${t}" style="stroke:${color}" d="${d}"/><path class="pipe flow ${t} ${back ? "back" : ""}" style="stroke:${color}" d="${d}"/>`
+        : `<path class="pipe idle ${t}" d="${d}"/>`;
+    };
+    // Verteiler: alle Kreise münden in einen Block, so kreuzt sich keine Leitung
+    const [mx, mx2] = L.man;
+    const manTop = narrow ? boiler.y + boiler.h + 12 : Math.min(top - 6, boiler.y + 46) - 16;
+    const manBot = narrow ? bottom + 22 : Math.max(bottom + 6, boiler.y + 74) + 16;
+    let s = narrow
+      ? pipe(any, true, COLD, `M20 ${boiler.y + boiler.h}V${manTop}`) + pipe(any, false, HOT, `M32 ${boiler.y + boiler.h}V${manTop}`)
+      : pipe(any, false, HOT, `M${boiler.x + boiler.w} ${boiler.y + 46}H${mx}`) + pipe(any, true, COLD, `M${boiler.x + boiler.w} ${boiler.y + 74}H${mx}`);
+    for (const r of rows) s += pipe(r.flow, true, COLD, `M${mx2} ${r.cy + 6}H${L.box[0]}`);
+    s += `<rect class="manifold" x="${mx}" y="${manTop}" width="${mx2 - mx}" height="${manBot - manTop}" rx="8"/>`;
     for (const r of rows) {
       const [bx, bx2] = L.box;
       const sub = r.floor ? `Pumpe ${r.t.pumpe_ist ? "läuft" : "aus"}${r.t.pumpe_soll !== r.t.pumpe_ist && r.t.pumpe_soll != null ? ` · würde ${r.t.pumpe_soll ? "ein" : "aus"}schalten` : ""}` : `${fmt(r.ist)} → ${fmt(r.soll)} °C`;
-      s += pipe(r.flow, false, HOT, `M${L.vl} ${r.cy - 6}H${bx}`) + I.pump(L.pump, r.cy - 6, r.flow);
+      s += pipe(r.flow, false, HOT, `M${mx2} ${r.cy - 6}H${bx}`) + I.pump(L.pump, r.cy - 6, r.flow);
       s += `<rect class="box ${r.flow ? "hot" : ""} ${r.problem ? "warnbox" : ""}" x="${bx}" y="${r.cy - 24}" width="${bx2 - bx}" height="48" rx="12"/>
         <text class="t" x="${bx + 14}" y="${r.cy - 4}">${esc(r.name)}</text>
         <text class="s" x="${bx + 14}" y="${r.cy + 14}">${esc(sub)}</text>`;
@@ -409,9 +415,10 @@ const CSS = `
   .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
   .schema .s { font-size: 12px; fill: var(--secondary-text-color); }
   .schema .big { font-size: 20px; font-weight: 600; fill: var(--primary-text-color); }
-  .schema .pipe { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .schema .pipe.thin { stroke-width: 2.2; }
+  .schema .pipe { fill: none; stroke-width: 3; stroke-linecap: butt; stroke-linejoin: round; } .schema .pipe.thin { stroke-width: 2.2; }
+  .schema .pipe.base { opacity: .35; } .schema .pipe.idle { stroke: ${IDLE}; opacity: .5; }
+  .schema .manifold { fill: var(--secondary-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
   .schema .pipe.flow { stroke-dasharray: 7 6; animation: flow 1s linear infinite; } .schema .pipe.flow.back { animation-direction: reverse; }
-  .schema .halo { fill: none; stroke: var(--card-background-color); stroke-width: 8; }
   @keyframes flow { to { stroke-dashoffset: -13; } }
   @media (prefers-reduced-motion: reduce) { .schema .pipe.flow { animation: none; } }
   .pump circle { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.6; } .pump path { fill: ${IDLE}; }
