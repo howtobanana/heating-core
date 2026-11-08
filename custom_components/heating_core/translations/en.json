@@ -13,11 +13,154 @@
       "already_configured": "This heating system is already configured."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "System settings",
+        "data": {
+          "eco_temp": "Eco temperature",
+          "away_temp": "Away temperature",
+          "min_trv_temp": "TRV minimum",
+          "hysteresis": "Hysteresis",
+          "budget_per_hour": "Write budget per hour",
+          "presence_activation_min": "Presence after (min)",
+          "presence_deactivation_min": "Presence hold (min)",
+          "window_delay_s": "Window open after (s)",
+          "window_settle_s": "Settle after closing (s)",
+          "away_entities": "Away entities",
+          "guest_entity": "Guest entity",
+          "summer_entity": "Summer entity",
+          "outdoor_sensor": "Outdoor temperature",
+          "weather_enabled": "Building compensation",
+          "weather_zone1": "Boost below −10 °C",
+          "weather_zone2": "Boost below 0 °C",
+          "weather_zone3": "Boost below +10 °C",
+          "boost_enabled": "Boost",
+          "boost_amount": "Boost amount",
+          "boost_threshold": "Boost threshold",
+          "humidity_enabled": "Humidity compensation",
+          "humidity_drop": "Drop per 10 % above 60 %"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "circuit": {
+      "entry_type": "Heating circuit",
+      "initiate_flow": {
+        "user": "Add heating circuit"
+      },
+      "step": {
+        "user": {
+          "title": "Heating circuit",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Comfort helper (optional)",
+            "presence_sensors": "Presence sensors",
+            "schedule": "Schedule",
+            "window": "Window sensor",
+            "temp_sensor": "Temperature sensor",
+            "comfort": "Comfort temperature",
+            "kind": "Type",
+            "master_climate": "Master thermostat / circuit",
+            "humidity_sensor": "Humidity sensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Heating circuit",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Comfort helper (optional)",
+            "presence_sensors": "Presence sensors",
+            "schedule": "Schedule",
+            "window": "Window sensor",
+            "temp_sensor": "Temperature sensor",
+            "comfort": "Comfort temperature",
+            "kind": "Type",
+            "master_climate": "Master thermostat / circuit",
+            "humidity_sensor": "Humidity sensor"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Saved."
+      }
+    },
+    "room": {
+      "entry_type": "Room",
+      "initiate_flow": {
+        "user": "Add room"
+      },
+      "step": {
+        "user": {
+          "title": "Room",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Comfort helper (optional)",
+            "presence_sensors": "Presence sensors",
+            "schedule": "Schedule",
+            "window": "Window sensor",
+            "temp_sensor": "Temperature sensor",
+            "comfort": "Comfort temperature",
+            "circuit": "Circuit",
+            "role": "Role",
+            "climate": "Radiator thermostat (TRV)",
+            "offset": "Offset to master (followers)"
+          }
+        },
+        "reconfigure": {
+          "title": "Room",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Comfort helper (optional)",
+            "presence_sensors": "Presence sensors",
+            "schedule": "Schedule",
+            "window": "Window sensor",
+            "temp_sensor": "Temperature sensor",
+            "comfort": "Comfort temperature",
+            "circuit": "Circuit",
+            "role": "Role",
+            "climate": "Radiator thermostat (TRV)",
+            "offset": "Offset to master (followers)"
+          }
+        }
+      },
+      "abort": {
+        "no_circuit": "Add a heating circuit first.",
+        "reconfigure_successful": "Saved."
+      }
+    }
+  },
   "selector": {
     "manufacturer": {
       "options": {
         "vaillant": "Vaillant (myVaillant)",
         "oekofen": "Ökofen (Pellematic)"
+      }
+    },
+    "kind": {
+      "options": {
+        "radiator": "Radiators",
+        "floor": "Floor heating"
+      }
+    },
+    "role": {
+      "options": {
+        "isolated": "Own room",
+        "follower": "Follows master"
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "away": {
+        "name": "Away"
+      },
+      "guest": {
+        "name": "Guest"
+      },
+      "write_enabled": {
+        "name": "Writing enabled"
       }
     }
   }

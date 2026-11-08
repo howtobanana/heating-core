@@ -13,11 +13,154 @@
       "already_configured": "Diese Anlage gibt es schon."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Einstellungen der Anlage",
+        "data": {
+          "eco_temp": "Eco-Temperatur",
+          "away_temp": "Abwesend-Temperatur",
+          "min_trv_temp": "TRV-Minimum (Frostschutz, Fenster offen)",
+          "hysteresis": "Hysterese",
+          "budget_per_hour": "Schreib-Budget pro Stunde",
+          "presence_activation_min": "Präsenz gilt nach (min)",
+          "presence_deactivation_min": "Präsenz-Nachlauf (min)",
+          "window_delay_s": "Fenster offen ab (s)",
+          "window_settle_s": "Nach Schließen warten (s)",
+          "away_entities": "Abwesend-Schalter (z. B. Geofencing)",
+          "guest_entity": "Gast-Schalter",
+          "summer_entity": "Sommer-Schalter",
+          "outdoor_sensor": "Außentemperatur",
+          "weather_enabled": "Gebäude-Kompensation",
+          "weather_zone1": "Aufschlag bis −10 °C",
+          "weather_zone2": "Aufschlag bis 0 °C",
+          "weather_zone3": "Aufschlag bis +10 °C",
+          "boost_enabled": "Boost",
+          "boost_amount": "Boost-Höhe",
+          "boost_threshold": "Boost ab Abstand",
+          "humidity_enabled": "Feuchte-Kompensation",
+          "humidity_drop": "Absenkung je 10 % über 60 %"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "circuit": {
+      "entry_type": "Heizkreis",
+      "initiate_flow": {
+        "user": "Heizkreis hinzufügen"
+      },
+      "step": {
+        "user": {
+          "title": "Heizkreis",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Komfort-Regler (optional)",
+            "presence_sensors": "Präsenzsensoren",
+            "schedule": "Zeitplan",
+            "window": "Fensterkontakt",
+            "temp_sensor": "Temperatursensor",
+            "comfort": "Komfort-Temperatur",
+            "kind": "Art",
+            "master_climate": "Master-Thermostat / Heizkreis",
+            "humidity_sensor": "Feuchtesensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Heizkreis",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Komfort-Regler (optional)",
+            "presence_sensors": "Präsenzsensoren",
+            "schedule": "Zeitplan",
+            "window": "Fensterkontakt",
+            "temp_sensor": "Temperatursensor",
+            "comfort": "Komfort-Temperatur",
+            "kind": "Art",
+            "master_climate": "Master-Thermostat / Heizkreis",
+            "humidity_sensor": "Feuchtesensor"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Gespeichert."
+      }
+    },
+    "room": {
+      "entry_type": "Raum",
+      "initiate_flow": {
+        "user": "Raum hinzufügen"
+      },
+      "step": {
+        "user": {
+          "title": "Raum",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Komfort-Regler (optional)",
+            "presence_sensors": "Präsenzsensoren",
+            "schedule": "Zeitplan",
+            "window": "Fensterkontakt",
+            "temp_sensor": "Temperatursensor",
+            "comfort": "Komfort-Temperatur",
+            "circuit": "Heizkreis",
+            "role": "Rolle",
+            "climate": "Heizkörper-Thermostat (TRV)",
+            "offset": "Abstand zum Master (nur Follower)"
+          }
+        },
+        "reconfigure": {
+          "title": "Raum",
+          "data": {
+            "name": "Name",
+            "comfort_entity": "Komfort-Regler (optional)",
+            "presence_sensors": "Präsenzsensoren",
+            "schedule": "Zeitplan",
+            "window": "Fensterkontakt",
+            "temp_sensor": "Temperatursensor",
+            "comfort": "Komfort-Temperatur",
+            "circuit": "Heizkreis",
+            "role": "Rolle",
+            "climate": "Heizkörper-Thermostat (TRV)",
+            "offset": "Abstand zum Master (nur Follower)"
+          }
+        }
+      },
+      "abort": {
+        "no_circuit": "Bitte zuerst einen Heizkreis anlegen.",
+        "reconfigure_successful": "Gespeichert."
+      }
+    }
+  },
   "selector": {
     "manufacturer": {
       "options": {
         "vaillant": "Vaillant (myVaillant)",
         "oekofen": "Ökofen (Pellematic)"
+      }
+    },
+    "kind": {
+      "options": {
+        "radiator": "Heizkörper",
+        "floor": "Fußbodenheizung"
+      }
+    },
+    "role": {
+      "options": {
+        "isolated": "Eigener Raum (eigene Regelung)",
+        "follower": "Folgt dem Master"
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "away": {
+        "name": "Abwesend"
+      },
+      "guest": {
+        "name": "Gast"
+      },
+      "write_enabled": {
+        "name": "Schreiben aktiv"
       }
     }
   }
