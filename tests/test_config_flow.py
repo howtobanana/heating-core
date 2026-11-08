@@ -22,16 +22,14 @@ async def test_anlage_anlegen(hass: HomeAssistant) -> None:
     assert result["data"] == USER_INPUT
 
 
-async def test_gleiche_anlage_nur_einmal(hass: HomeAssistant) -> None:
+async def test_nur_eine_anlage_pro_ha(hass: HomeAssistant) -> None:
+    """Fabian, 09.11.2026: nur eine Anlage je HA-Instanz – auch mit anderem Namen keine zweite."""
     MockConfigEntry(domain=DOMAIN, unique_id="wien", data=USER_INPUT).add_to_hass(hass)
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {**USER_INPUT, "name": " WIEN "}
-    )
     assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
+    assert result["reason"] == "single_instance_allowed"
 
 
 async def test_einrichten_und_entladen(hass: HomeAssistant) -> None:

@@ -93,7 +93,7 @@ def _opt(key: str, data: dict) -> Any:
 
 
 class HeatingCoreConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Eine Anlage (ein Haus, ein Hersteller) je Eintrag."""
+    """Eine Anlage je HA-Instanz (Fabian, 09.11.2026; manifest single_config_entry); Heizkreise und Räume darunter beliebig."""
 
     VERSION = 1
 
