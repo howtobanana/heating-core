@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up heating system",
+        "data": {
+          "name": "Name",
+          "manufacturer": "Manufacturer"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This heating system is already configured."
+    }
+  },
+  "selector": {
+    "manufacturer": {
+      "options": {
+        "vaillant": "Vaillant (myVaillant)",
+        "oekofen": "Ökofen (Pellematic)"
+      }
+    }
+  }
+}

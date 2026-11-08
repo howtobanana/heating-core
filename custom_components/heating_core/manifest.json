@@ -1,0 +1,12 @@
+{
+  "domain": "heating_core",
+  "name": "Heating Core",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/howtobanana/heating-core",
+  "integration_type": "hub",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/howtobanana/heating-core/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

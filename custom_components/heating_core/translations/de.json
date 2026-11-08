@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Anlage einrichten",
+        "data": {
+          "name": "Name der Anlage",
+          "manufacturer": "Hersteller"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Diese Anlage gibt es schon."
+    }
+  },
+  "selector": {
+    "manufacturer": {
+      "options": {
+        "vaillant": "Vaillant (myVaillant)",
+        "oekofen": "Ökofen (Pellematic)"
+      }
+    }
+  }
+}
