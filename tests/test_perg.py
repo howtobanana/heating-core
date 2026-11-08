@@ -118,3 +118,17 @@ async def test_kreis_aus_wird_nicht_uebersteuert(hass: HomeAssistant) -> None:
     coordinator = await _setup(hass, entry)
     hk = coordinator.data["circuits"]["hk2"]
     assert (hk["decision"], hk["would_write"], hk["mode"]) == ("circuit_off", False, "circuit_off")
+
+
+async def test_thermostat_je_zone(hass: HomeAssistant, perg) -> None:
+    hass.states.async_set(L3, "on")  # Zone erst offen, wenn alle ihre Ventile offen sind
+    await _setup(hass, _entry())
+    # externer Fußbodenkreis hat keinen eigenen Sollwert -> kein Thermostat, seine Zonen schon
+    assert hass.states.get("climate.hk3_fussboden") is None
+    wohn = hass.states.get("climate.wohnzimmer_ug")
+    assert (wohn.state, wohn.attributes["current_temperature"], wohn.attributes["temperature"]) == ("heat", 20.0, 22.0)
+    assert wohn.attributes["hvac_action"] == "heating"  
+    await hass.services.async_call("climate", "set_temperature", {"entity_id": "climate.wohnzimmer_ug", "temperature": 23.5}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get("climate.wohnzimmer_ug").attributes["temperature"] == 23.5
+    assert hass.states.get("number.wohnzimmer_ug_comfort").state == "23.5"  # gleicher Regler

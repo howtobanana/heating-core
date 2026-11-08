@@ -16,7 +16,7 @@ from .coordinator import HeatingCoordinator
 PANEL_URL = "heizung"
 STATIC_URL = "/heating_core_static"
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.CLIMATE, Platform.NUMBER, Platform.SENSOR, Platform.SWITCH]
 
 type HeatingConfigEntry = ConfigEntry[HeatingCoordinator]
 
@@ -60,7 +60,7 @@ async def _register_panel(hass: HomeAssistant) -> None:
         webcomponent_name="heating-core-panel",
         sidebar_title="Heizung",
         sidebar_icon="mdi:radiator",
-        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.3.0",
+        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.4.0",
         require_admin=False,
     )
     hass.data[f"{DOMAIN}_panel"] = True

@@ -55,18 +55,20 @@ def _sensor(hass, name_part):
 
 
 async def test_schattenbetrieb_rechnet_schreibt_nicht(hass: HomeAssistant, states) -> None:
-    calls = async_mock_service(hass, "climate", "set_temperature")
-    await _setup(hass, _entry())
+    coordinator = await _setup(hass, _entry())
     kreis = _sensor(hass, "kreis")
     assert float(kreis.state) == 22.0  # Präsenz -> Komfort
     assert kreis.attributes["wuerde_schreiben"] is True
+    calls = async_mock_service(hass, "climate", "set_temperature")
+    await coordinator.async_refresh()
     assert calls == []
     assert hass.states.get("switch.test_writing_enabled").state == "off"
 
 
 async def test_schreiben_aktiv_schreibt_master(hass: HomeAssistant, states) -> None:
-    calls = async_mock_service(hass, "climate", "set_temperature")
     coordinator = await _setup(hass, _entry())
+    # Platzhalter erst nach dem Start: die eigenen Thermostate laden den echten climate-Dienst
+    calls = async_mock_service(hass, "climate", "set_temperature")
     with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
         coordinator._started = 0
         await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.test_writing_enabled"}, blocking=True)
