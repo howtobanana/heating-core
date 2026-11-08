@@ -1,13 +1,12 @@
-# Heating Core Blueprints
+# Heating Core
 
-Herstellerunabhängige Heizungslogik für Home Assistant als ein Blueprint.
-Eine Einstellung „Hersteller“ wählt nur die gerätespezifischen Teile
-(Sollwert schreiben, Betriebsart, Sommer-Aus).
+Eigene Home-Assistant-Integration (HACS) für die Heizungssteuerung: eine
+gemeinsame Logik für Räume, Präsenz, Fenster, Abwesenheit, Sommer und
+Schreib-Budget, dazu ein Adapter je Hersteller.
 
 ## Hersteller
-- Vaillant (myVaillant) – Basis, aus `howtobanana/vaillant-suite-blueprints`
-- Ökofen (Pellematic) – folgt, wenn Vaillant auf dem Kern läuft
+- Vaillant (myVaillant) – zuerst; Logik aus `howtobanana/vaillant-suite-blueprints`
+- Ökofen (Pellematic) – danach, mit mehreren Heizkreisen und Fußbodenheizung
 
-## Struktur
-- `blueprints/` Blueprints
-- `docs/` Doku und Changelog
+## Stand
+Konzeptphase. Privat, bis Vaillant in Wien stabil läuft.
