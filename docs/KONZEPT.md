@@ -86,15 +86,25 @@ Die Logik entscheidet **was** (Soll je Kreis), der Adapter **wie**.
 - Cloud meldet Änderungen bis zu 30 min verzögert → Bestätigungs-Verzögerung 30 min.
 - Räume: Zigbee-TRVs (`climate.*`), direkt geschrieben.
 
-### Ökofen (oekofen-pellematic-compact)
+### Ökofen (oekofen-pellematic-compact) – Standard
 
-- Perg: HK1 „Heizung OG“, HK2 „Heizung UG“.
+Allgemeine Variante: Alle Heizkreise sind in der Pellematic angelegt, auch die
+Fußbodenheizung als eigener Ökofen-Heizkreis (Typ Fußboden).
+
+- Kreise: `climate.pellematic_heating_circuit_N_climate`, je Kreis Typ Heizkörper
+  oder Fußboden (in der Einrichtung gewählt, steuert Trägheit, Hysterese, Vorheizzeit).
 - Sollwert: `number.pellematic_heating_circuit_N_remote_override` (Offset in K,
   begrenzt), alternativ `*_temp_heat` / `*_temp_setback`.
 - Betriebsart: `select.pellematic_heating_circuit_N_mode_auto` (auto/heizen/absenken/aus).
 - Pelletkessel: Mindestlaufzeit, längere Holds, größere Hysterese.
-- Fußboden (Entwurf): Zonen mit Ventil-Schalter (`switch.*`), Raumsensor,
-  Rohrtemperatur-Grenze (Estrichschutz, alle Ventile zu bei Überschreitung).
+
+### Sonderfall Perg (später, eigene Karte)
+
+In Perg ist die Fußbodenheizung nicht offiziell in der Pellematic eingebunden,
+sondern über einen eigenen Controller mit Ventil-Kanälen geregelt
+(`switch.coordinator_fussbodenheizung_l1` … `l4`). Fabian beschreibt den
+Sonderfall gerade; er kommt erst nach dem Ökofen-Standard. Das Datenmodell hält
+dafür FBH-Zonen mit Ventil-Schalter, Raumsensor und Rohrtemperatur-Grenze bereit.
 
 ## 5. Entitäten der Integration
 
@@ -144,13 +154,9 @@ offen in HEATING-3). Warmwasser wird nicht gesteuert.
 
 ## 10. Offene Fragen an Fabian
 
-1. **Fußbodenheizung Perg:** In HA Perg gibt es einen Controller mit vier Ventil-
-   Kanälen (`switch.coordinator_fussbodenheizung_l1` … `l4`); der Ökofen-Entwurf
-   kennt nur drei Zonen. Welcher Kanal ist welcher Raum, und aus welchem Kreis
-   (HK1 OG / HK2 UG) wird die FBH gespeist? Gibt es den Rohrtemperatur-Sensor schon?
-2. **Räume Perg:** Welche Räume und TRVs gehören zu HK1 (OG) und HK2 (UG)?
-   In HA Perg ist bisher ein Zigbee-TRV (`climate.0xa4c138351b5c1ab7`) eingebunden.
-3. **Ökofen-Sollwert:** Steuern über den Offset `remote_override` (Empfehlung,
+1. **Sonderfall Perg:** kommt mit Fabians Beschreibung in eine eigene Karte (HEATING-8);
+   für dieses Konzept nicht nötig.
+2. **Ökofen-Sollwert:** Steuern über den Offset `remote_override` (Empfehlung,
    die Kessellogik bleibt aktiv) oder direkt über `temp_heat`/`temp_setback`?
-4. **Mindest-HA-Version:** Empfehlung 2026.10 (Wien und Perg laufen auf 2026.10.4), ältere nicht unterstützen.
-5. **Name in HACS / Domain:** `heating_core` („Heating Core“) – passt das?
+3. **Mindest-HA-Version:** Empfehlung 2026.10 (Wien und Perg laufen auf 2026.10.4), ältere nicht unterstützen.
+4. **Name in HACS / Domain:** `heating_core` („Heating Core“) – passt das?
