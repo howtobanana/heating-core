@@ -251,15 +251,12 @@ class HeatingCorePanel extends HTMLElement {
       }
     }
     const bx = narrow ? boiler.x + 18 : boiler.x + boiler.w / 2;
-    // Pelletlager: die Kessel-Box füllt sich von unten wie ein Tank (Stand / Maximum der Anlage)
+    // Pelletlager: Restmenge in kg, Farbe nach Füllstand (Stand / Maximum der Anlage)
     const kg = fuel?.state, max = fuel?.attributes?.max_kg;
-    const p = has(kg) && has(max) && Number(max) > 0 ? Math.max(0, Math.min(1, Number(kg) / Number(max))) : null;
-    const clip = `hc-tank-${(this._clipN = (this._clipN || 0) + 1)}`;
-    const tank = p === null ? "" : `<clipPath id="${clip}"><rect x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/></clipPath>
-      <rect class="tankfill ${p < 0.15 ? "low" : ""}" clip-path="url(#${clip})" x="${boiler.x}" y="${boiler.y + boiler.h * (1 - p)}" width="${boiler.w}" height="${boiler.h * p}"/>`;
-    const label = has(kg) ? `${narrow ? "Pellets " : ""}${Math.round(Number(kg)).toLocaleString("de-AT")} kg${p !== null ? ` · ${Math.round(p * 100)} %` : ""}` : "";
-    const pellets = label ? `<text class="t sm ${narrow ? "end" : "mid"}" x="${narrow ? boiler.x + boiler.w - 16 : bx}" y="${narrow ? boiler.y + 38 : boiler.y + 96}">${label}</text>` : "";
-    s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
+    const p = has(kg) && has(max) && Number(max) > 0 ? Number(kg) / Number(max) : null;
+    const level = p === null ? "" : p < 0.15 ? "low" : p < 0.35 ? "mid" : "ok";
+    const pellets = has(kg) ? `<text class="pel ${level} ${narrow ? "end" : "mid"}" x="${narrow ? boiler.x + boiler.w - 16 : bx}" y="${narrow ? boiler.y + 40 : boiler.y + 98}">${Math.round(Number(kg)).toLocaleString("de-AT")} kg</text>` : "";
+    s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>
       <text class="s ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 24 : boiler.y + 34}">${fuel ? "Pelletkessel" : "Wärmeerzeuger"}</text>
       <text class="big ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 48 : boiler.y + 64}">${has(kessel) ? fmt(kessel, 0) + " °C" : "–"}</text>
       ${pellets}` + s;
@@ -406,7 +403,7 @@ const CSS = `
   .schema { display:block; width: 100%; height: auto; } .schema.wide { max-width: 980px; margin: 0 auto; }
   .schema .box { fill: var(--card-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
   .schema .box.hot { stroke: ${HOT}; } .schema .box.warnbox { stroke: ${WARN}; stroke-dasharray: 4 3; }
-  .schema .tankfill { fill: #c8a165; opacity: .45; } .schema .tankfill.low { fill: ${WARN}; }
+  .schema .pel { font-size: 15px; font-weight: 600; fill: var(--primary-text-color); } .schema .pel.ok { fill: #43a047; } .schema .pel.mid { fill: ${WARN}; } .schema .pel.low { fill: #e53935; }
   .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; }
   .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; } .schema .end { text-anchor: end; }
   .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
