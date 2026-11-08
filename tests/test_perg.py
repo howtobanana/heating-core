@@ -101,3 +101,20 @@ async def test_kessel_kalt_keine_pumpe(hass: HomeAssistant, perg) -> None:
     coordinator = await _setup(hass, _entry())
     hk3 = coordinator.data["circuits"]["hk3"]
     assert (hk3["source_ok"], hk3["pump_wanted"], hk3["mode"]) == (False, False, "source_cold")
+
+
+async def test_kreis_aus_wird_nicht_uebersteuert(hass: HomeAssistant) -> None:
+    hk2 = "climate.pellematic_heating_circuit_2_climate"
+    hass.states.async_set(hk2, "off", {"temperature": 8.0, "current_temperature": 19.9})
+    hass.states.async_set("sensor.pellematic_heating_circuit_2_l_roomtemp_set", "8.0")
+    hass.states.async_set("number.pellematic_heating_circuit_2_remote_override", "0")
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Perg2", unique_id="perg2",
+        data={"name": "Perg2", "manufacturer": "oekofen"},
+        options={"eco_temp": 19.0},
+        subentries_data=[ConfigSubentryData(data={"kind": "radiator", "master_climate": hk2, "comfort": 20.0},
+                                            subentry_id="hk2", subentry_type="circuit", title="HK2", unique_id=None)],
+    )
+    coordinator = await _setup(hass, entry)
+    hk = coordinator.data["circuits"]["hk2"]
+    assert (hk["decision"], hk["would_write"], hk["mode"]) == ("circuit_off", False, "circuit_off")

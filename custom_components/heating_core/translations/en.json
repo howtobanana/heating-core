@@ -212,7 +212,8 @@
           "floor_heating": "Floor heating",
           "floor_idle": "Floor idle",
           "source_cold": "Boiler too cold",
-          "sensor_missing": "Sensor missing"
+          "sensor_missing": "Sensor missing",
+          "circuit_off": "Circuit off (by the system)"
         }
       }
     },

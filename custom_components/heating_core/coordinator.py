@@ -70,7 +70,7 @@ from .const import (
 from .floor import Zone, plan as floor_plan
 from .logic import Globals, MasterInput, RoomInput, follower_target, master_target, room_base, room_target
 from .timing import Reading, presence, window
-from .writes import Write, WriteConfig, decide
+from .writes import Decision, Write, WriteConfig, decide
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -321,6 +321,10 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             renew_due=state.renew_due,
             startup_done=now - self._started >= STARTUP_GUARD_S,
         )
+        if state.heating_off and not m_res.forced_min:
+            # Kreis von der Anlage selbst abgeschaltet: nicht übersteuern.
+            dec = Decision(False, "none", "circuit_off")
+            out["mode"] = "circuit_off"
         out["decision"] = dec.reason
         out["budget_left"] = max(0, WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET))).budget - len([w for w in writes if now - w.ts < 3600]))
         out["would_write"] = dec.write

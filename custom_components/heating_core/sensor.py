@@ -42,7 +42,7 @@ class CircuitTarget(_Target):
     def extra_state_attributes(self):
         d = self._data()
         return {
-            "modus": d.get("state"),
+            "zustand": d.get("state"),
             "anlage_sollwert": d.get("set_now"),
             "entscheidung": d.get("decision"),
             "wuerde_schreiben": d.get("would_write"),

@@ -49,7 +49,8 @@ class OekofenAdapter:
         current = self._num(f"sensor.{base}_l_roomtemp_act")
         if current is None:
             current = _float(st.attributes.get("current_temperature"))
-        return CircuitState(setpoint, current, True)
+        # climate „off“ = Pellematic hat den Kreis abgeschaltet (Heizgrenze, Aus) -> nicht übersteuern
+        return CircuitState(setpoint, current, True, heating_off=st.state == "off")
 
     def limits(self, master_entity: str) -> AdapterLimits:
         st = self.hass.states.get(master_entity)

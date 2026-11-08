@@ -35,5 +35,4 @@ class HeatingEntity(CoordinatorEntity[HeatingCoordinator]):
                 identifiers={(DOMAIN, f"{entry.entry_id}_{subentry_id}")},
                 name=subentry_title,
                 manufacturer="Heating Core",
-                via_device=(DOMAIN, entry.entry_id),
             )

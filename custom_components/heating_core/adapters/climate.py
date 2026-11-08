@@ -26,6 +26,7 @@ class ClimateAdapter:
             _float(st.attributes.get("temperature")),
             _float(st.attributes.get("current_temperature")),
             True,
+            heating_off=st.state == "off",
         )
 
     def limits(self, master_entity: str) -> AdapterLimits:
