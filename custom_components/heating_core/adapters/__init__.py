@@ -6,9 +6,11 @@ from homeassistant.core import HomeAssistant
 
 from .base import HeatingAdapter
 from .climate import ClimateAdapter
+from .oekofen import OekofenAdapter
 
 
 def get_adapter(hass: HomeAssistant, manufacturer: str) -> HeatingAdapter:
-    """Adapter zum Hersteller. Vaillant (HEATING-11) und Ökofen (HEATING-8) folgen;
-    bis dahin schreibt der allgemeine Klima-Adapter über climate.set_temperature."""
+    """Adapter zum Hersteller. Vaillant nutzt bis HEATING-11 den allgemeinen Klima-Adapter."""
+    if manufacturer == "oekofen":
+        return OekofenAdapter(hass)
     return ClimateAdapter(hass)

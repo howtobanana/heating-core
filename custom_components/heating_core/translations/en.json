@@ -64,7 +64,12 @@
             "comfort": "Comfort temperature",
             "kind": "Type",
             "master_climate": "Master thermostat / circuit",
-            "humidity_sensor": "Humidity sensor"
+            "humidity_sensor": "Humidity sensor",
+            "pump_switch": "Pump (external floor only)",
+            "source_temp_sensor": "Boiler temperature (external floor only)",
+            "source_on": "Enable above boiler temperature",
+            "source_off": "Disable below boiler temperature",
+            "valve_delay_s": "Pump after valves open (s)"
           }
         },
         "reconfigure": {
@@ -79,12 +84,22 @@
             "comfort": "Comfort temperature",
             "kind": "Type",
             "master_climate": "Master thermostat / circuit",
-            "humidity_sensor": "Humidity sensor"
+            "humidity_sensor": "Humidity sensor",
+            "pump_switch": "Pump (external floor only)",
+            "source_temp_sensor": "Boiler temperature (external floor only)",
+            "source_on": "Enable above boiler temperature",
+            "source_off": "Disable below boiler temperature",
+            "valve_delay_s": "Pump after valves open (s)"
           }
         }
       },
       "abort": {
         "reconfigure_successful": "Saved."
+      },
+      "error": {
+        "floor_needs_pump": "External floor needs pump and boiler temperature.",
+        "source_hysteresis": "Disable must be below enable.",
+        "master_required": "Please choose the master thermostat/circuit."
       }
     },
     "room": {
@@ -106,7 +121,8 @@
             "circuit": "Circuit",
             "role": "Role",
             "climate": "Radiator thermostat (TRV)",
-            "offset": "Offset to master (followers)"
+            "offset": "Offset to master (followers)",
+            "valves": "Valve channels (floor zone, switch together)"
           }
         },
         "reconfigure": {
@@ -122,13 +138,18 @@
             "circuit": "Circuit",
             "role": "Role",
             "climate": "Radiator thermostat (TRV)",
-            "offset": "Offset to master (followers)"
+            "offset": "Offset to master (followers)",
+            "valves": "Valve channels (floor zone, switch together)"
           }
         }
       },
       "abort": {
         "no_circuit": "Add a heating circuit first.",
         "reconfigure_successful": "Saved."
+      },
+      "error": {
+        "zone_needs_valves": "Floor zone needs at least one valve.",
+        "climate_required": "Please choose the thermostat."
       }
     }
   },
@@ -142,13 +163,15 @@
     "kind": {
       "options": {
         "radiator": "Radiators",
-        "floor": "Floor heating"
+        "floor": "Floor heating",
+        "floor_external": "External floor (own pump + valves)"
       }
     },
     "role": {
       "options": {
         "isolated": "Own room",
-        "follower": "Follows master"
+        "follower": "Follows master",
+        "floor_zone": "Floor zone (valves)"
       }
     }
   },
@@ -185,7 +208,11 @@
           "temperature_drop": "Temperature drop",
           "summer": "Summer (heating off)",
           "follower": "Follows master",
-          "unavailable": "Unavailable"
+          "unavailable": "Unavailable",
+          "floor_heating": "Floor heating",
+          "floor_idle": "Floor idle",
+          "source_cold": "Boiler too cold",
+          "sensor_missing": "Sensor missing"
         }
       }
     },

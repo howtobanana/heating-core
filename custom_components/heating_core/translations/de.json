@@ -64,7 +64,12 @@
             "comfort": "Komfort-Temperatur",
             "kind": "Art",
             "master_climate": "Master-Thermostat / Heizkreis",
-            "humidity_sensor": "Feuchtesensor"
+            "humidity_sensor": "Feuchtesensor",
+            "pump_switch": "Pumpe (nur Fußboden extern)",
+            "source_temp_sensor": "Kesseltemperatur (nur Fußboden extern)",
+            "source_on": "Freigabe ab Kesseltemperatur",
+            "source_off": "Sperre unter Kesseltemperatur",
+            "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)"
           }
         },
         "reconfigure": {
@@ -79,12 +84,22 @@
             "comfort": "Komfort-Temperatur",
             "kind": "Art",
             "master_climate": "Master-Thermostat / Heizkreis",
-            "humidity_sensor": "Feuchtesensor"
+            "humidity_sensor": "Feuchtesensor",
+            "pump_switch": "Pumpe (nur Fußboden extern)",
+            "source_temp_sensor": "Kesseltemperatur (nur Fußboden extern)",
+            "source_on": "Freigabe ab Kesseltemperatur",
+            "source_off": "Sperre unter Kesseltemperatur",
+            "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)"
           }
         }
       },
       "abort": {
         "reconfigure_successful": "Gespeichert."
+      },
+      "error": {
+        "floor_needs_pump": "Fußboden extern braucht Pumpe und Kesseltemperatur.",
+        "source_hysteresis": "Sperre muss unter der Freigabe liegen.",
+        "master_required": "Bitte das Master-Thermostat bzw. den Heizkreis wählen."
       }
     },
     "room": {
@@ -106,7 +121,8 @@
             "circuit": "Heizkreis",
             "role": "Rolle",
             "climate": "Heizkörper-Thermostat (TRV)",
-            "offset": "Abstand zum Master (nur Follower)"
+            "offset": "Abstand zum Master (nur Follower)",
+            "valves": "Ventil-Kanäle (nur Fußboden-Zone, schalten gemeinsam)"
           }
         },
         "reconfigure": {
@@ -122,13 +138,18 @@
             "circuit": "Heizkreis",
             "role": "Rolle",
             "climate": "Heizkörper-Thermostat (TRV)",
-            "offset": "Abstand zum Master (nur Follower)"
+            "offset": "Abstand zum Master (nur Follower)",
+            "valves": "Ventil-Kanäle (nur Fußboden-Zone, schalten gemeinsam)"
           }
         }
       },
       "abort": {
         "no_circuit": "Bitte zuerst einen Heizkreis anlegen.",
         "reconfigure_successful": "Gespeichert."
+      },
+      "error": {
+        "zone_needs_valves": "Fußboden-Zone braucht mindestens einen Ventil-Kanal.",
+        "climate_required": "Bitte das Thermostat wählen."
       }
     }
   },
@@ -142,13 +163,15 @@
     "kind": {
       "options": {
         "radiator": "Heizkörper",
-        "floor": "Fußbodenheizung"
+        "floor": "Fußbodenheizung",
+        "floor_external": "Fußboden extern (eigene Pumpe + Ventile)"
       }
     },
     "role": {
       "options": {
         "isolated": "Eigener Raum (eigene Regelung)",
-        "follower": "Folgt dem Master"
+        "follower": "Folgt dem Master",
+        "floor_zone": "Fußboden-Zone (Ventil-Kanäle)"
       }
     }
   },
@@ -185,7 +208,11 @@
           "temperature_drop": "Temperatursturz",
           "summer": "Sommer (Heizung aus)",
           "follower": "Folgt dem Master",
-          "unavailable": "Nicht erreichbar"
+          "unavailable": "Nicht erreichbar",
+          "floor_heating": "Fußboden heizt",
+          "floor_idle": "Fußboden in Ruhe",
+          "source_cold": "Kessel zu kalt",
+          "sensor_missing": "Sensor fehlt"
         }
       }
     },

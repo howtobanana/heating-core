@@ -48,6 +48,11 @@ class CircuitTarget(_Target):
             "wuerde_schreiben": d.get("would_write"),
             "problem": d.get("problem"),
             "schreib_budget_rest": d.get("budget_left"),
+            "kessel_temperatur": d.get("source_temp"),
+            "kessel_freigabe": d.get("source_ok"),
+            "pumpe_soll": d.get("pump_wanted"),
+            "pumpe_ist": d.get("pump_on"),
+            "wuerde_schalten": d.get("would_switch"),
             "ist_temperatur": d.get("current"),
         }
 
@@ -67,7 +72,8 @@ class RoomTarget(_Target):
     def extra_state_attributes(self):
         d = self._data()
         return {"modus": d.get("mode"), "trv_sollwert": d.get("setpoint"), "ist_temperatur": d.get("current"),
-                "waermebedarf": d.get("heat_demand"), "problem": d.get("problem")}
+                "waermebedarf": d.get("heat_demand"), "problem": d.get("problem"),
+                "ventile_offen": d.get("valves_open"), "ventile_soll": d.get("valves_wanted")}
 
 
 def _find(coordinator, sid: str, circuit: bool) -> dict:

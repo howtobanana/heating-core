@@ -56,6 +56,17 @@ class RoomResult:
     needs_heat: bool
 
 
+def room_base(g: Globals, r: RoomInput) -> tuple[float, bool]:
+    """Zieltemperatur des Raums ohne Ein/Aus-Regelung (für Fußboden-Zonen) und ob Bedarf besteht."""
+    pre_heat = r.pre_heat_on and not g.summer
+    active = r.schedule_on or r.presence_on or (not r.has_demand_source) or pre_heat
+    if g.summer or r.window_open_too_long:
+        return g.min_trv, active
+    if g.away_effective and not pre_heat:
+        return g.away_temp, active
+    return (r.comfort if active else g.eco), active
+
+
 def room_target(g: Globals, r: RoomInput) -> RoomResult:
     """Sollwert eines isolierten Raums."""
     pre_heat = r.pre_heat_on and not g.summer

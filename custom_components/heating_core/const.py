@@ -72,8 +72,17 @@ F_SCHEDULE = "schedule"
 F_WINDOW = "window"
 F_TEMP = "temp_sensor"
 F_HUMIDITY = "humidity_sensor"
+# Fußboden extern (Sonderfall Perg)
+KIND_FLOOR_EXTERNAL = "floor_external"
+ROLE_FLOOR_ZONE = "floor_zone"
+F_PUMP = "pump_switch"
+F_SOURCE_TEMP = "source_temp_sensor"
+F_SOURCE_ON = "source_on"
+F_SOURCE_OFF = "source_off"
+F_VALVE_DELAY = "valve_delay_s"
+F_VALVES = "valves"
 
 STARTUP_GUARD_S = 120
 UPDATE_INTERVAL_S = 180
 
-MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable"]
+MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing"]

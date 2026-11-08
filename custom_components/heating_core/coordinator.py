@@ -23,6 +23,14 @@ from .const import (
     F_COMFORT,
     F_COMFORT_ENTITY,
     F_HUMIDITY,
+    F_KIND,
+    F_PUMP,
+    F_SOURCE_OFF,
+    F_SOURCE_ON,
+    F_SOURCE_TEMP,
+    F_VALVE_DELAY,
+    F_VALVES,
+    KIND_FLOOR_EXTERNAL,
     F_MASTER,
     F_NAME,
     F_OFFSET,
@@ -59,7 +67,8 @@ from .const import (
     SUB_ROOM,
     UPDATE_INTERVAL_S,
 )
-from .logic import Globals, MasterInput, RoomInput, follower_target, master_target, room_target
+from .floor import Zone, plan as floor_plan
+from .logic import Globals, MasterInput, RoomInput, follower_target, master_target, room_base, room_target
 from .timing import Reading, presence, window
 from .writes import Write, WriteConfig, decide
 
@@ -83,6 +92,7 @@ class ControlState:
     writes: dict[str, list[Write]] = field(default_factory=dict)
     presence: dict[str, bool] = field(default_factory=dict)
     pre_heat: dict[str, float] = field(default_factory=dict)  # Subentry -> Start (Sekunden)
+    source_ok: dict[str, bool] = field(default_factory=dict)  # Fußbodenkreis -> Kessel freigegeben
 
 
 class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -127,10 +137,11 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.opt(key):
                 ids.add(self.opt(key))
         for cfg in [*self.circuits().values(), *(s.data for s in self.entry.subentries.values() if s.subentry_type == SUB_ROOM)]:
-            for key in (F_MASTER, F_CLIMATE, F_COMFORT_ENTITY, F_SCHEDULE, F_WINDOW, F_TEMP, F_HUMIDITY):
+            for key in (F_MASTER, F_CLIMATE, F_COMFORT_ENTITY, F_SCHEDULE, F_WINDOW, F_TEMP, F_HUMIDITY, F_PUMP, F_SOURCE_TEMP):
                 if cfg.get(key):
                     ids.add(cfg[key])
             ids.update(cfg.get(F_PRESENCE) or [])
+            ids.update(cfg.get(F_VALVES) or [])
         return ids
 
     @callback
@@ -225,6 +236,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return result
 
     async def _circuit(self, cid: str, ccfg: dict, g: Globals, now: float) -> dict[str, Any]:
+        if ccfg.get(F_KIND) == KIND_FLOOR_EXTERNAL:
+            return await self._floor_circuit(cid, ccfg, g, now)
         master_entity = ccfg.get(F_MASTER)
         state = self.adapter.read(master_entity)
         out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": state.available}
@@ -323,6 +336,77 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     await self.hass.services.async_call(
                         "climate", "set_temperature", {"entity_id": room["entity"], "temperature": tgt}, blocking=True
                     )
+        return out
+
+    async def _floor_circuit(self, cid: str, ccfg: dict, g: Globals, now: float) -> dict[str, Any]:
+        """Fußboden mit eigener Pumpe und Ventil-Kanälen (Sonderfall Perg)."""
+        out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": True, "target": None}
+        zones: list[Zone] = []
+        valves_by_zone: dict[str, list[str]] = {}
+        for rid, rcfg in self.rooms(cid).items():
+            valves = rcfg.get(F_VALVES) or []
+            valves_by_zone[rid] = valves
+            readings = [self._reading(v) for v in valves]
+            open_now = bool(valves) and all(r.state == "on" for r in readings)
+            open_since = max(r.since for r in readings) if open_now else None
+            temp = self._num(rcfg.get(F_TEMP))
+            win = self._window(rcfg.get(F_WINDOW), now)
+            presence_on = self._presence(rid, rcfg.get(F_PRESENCE) or [], now)
+            schedule_on = self._on(rcfg.get(F_SCHEDULE))
+            target, _active = room_base(g, RoomInput(
+                comfort=self._comfort(rcfg), current_temp=temp or 0.0, current_setpoint=0.0,
+                schedule_on=schedule_on, presence_on=presence_on,
+                pre_heat_on=self._pre_heat(rid, now, presence_on or schedule_on),
+                has_demand_source=bool(rcfg.get(F_SCHEDULE) or rcfg.get(F_PRESENCE)),
+                window_open_too_long=win.open_too_long,
+            ))
+            zones.append(Zone(rid, temp, target, open_now, open_since))
+            out["rooms"][rid] = {"name": rcfg[F_NAME], "target": target, "current": temp, "valves_open": open_now,
+                                 "presence": presence_on}
+
+        source = self._num(ccfg.get(F_SOURCE_TEMP))
+        pump_entity = ccfg.get(F_PUMP)
+        p = floor_plan(
+            zones,
+            now=now,
+            source_temp=source,
+            source_on=float(ccfg.get(F_SOURCE_ON, 50.0)),
+            source_off=float(ccfg.get(F_SOURCE_OFF, 45.0)),
+            source_ok_before=self.control.source_ok.get(cid, False),
+            pump_on=self._on(pump_entity),
+            valve_delay_s=float(ccfg.get(F_VALVE_DELAY, 180)),
+            hysteresis=0.5,
+        )
+        self.control.source_ok[cid] = p.source_ok
+        for z in zones:
+            room = out["rooms"][z.key]
+            room["valves_wanted"] = p.zones[z.key]
+            if z.key in p.problems:
+                room["problem"] = p.problems[z.key]
+                room["mode"] = "sensor_missing"
+            else:
+                room["mode"] = "floor_heating" if p.zones[z.key] else "floor_idle"
+        out.update(source_temp=source, source_ok=p.source_ok, pump_wanted=p.pump, pump_on=self._on(pump_entity),
+                   mode="floor_heating" if p.pump else ("source_cold" if not p.source_ok else "floor_idle"),
+                   state="shadow" if not self.control.write_enabled else "active")
+        if source is None:
+            out["problem"] = "source_temperature_unknown"
+
+        switches: list[tuple[str, bool]] = []
+        for rid, wanted in p.zones.items():
+            if wanted is None:
+                continue
+            switches += [(v, wanted) for v in valves_by_zone[rid] if self._on(v) != wanted]
+        if pump_entity and self._on(pump_entity) != p.pump:
+            # Pumpe zuerst aus bzw. zuletzt an
+            switches = [(pump_entity, p.pump)] + switches if not p.pump else switches + [(pump_entity, p.pump)]
+        out["would_switch"] = [f"{e} → {'an' if on else 'aus'}" for e, on in switches]
+        out["would_write"] = bool(switches)
+        if switches and self.control.write_enabled and now - self._started >= STARTUP_GUARD_S:
+            for entity_id, on in switches:
+                await self.hass.services.async_call(
+                    "switch", "turn_on" if on else "turn_off", {"entity_id": entity_id}, blocking=True
+                )
         return out
 
     def _room_input(self, rid: str, rcfg: dict, now: float) -> RoomInput | None:
