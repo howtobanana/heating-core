@@ -186,3 +186,13 @@ def test_master_grenzen_der_anlage():
 def test_master_sommer():
     g = Globals(**{**G.__dict__, "summer": True})
     assert master_target(g, master(), []).state == "summer"
+
+
+def test_heizkurve_haelt_sollwert_statt_zu_takten():
+    """Ökofen (modulating): warmer Raum fällt nicht auf Eco zurück, 22,8 bleibt 22,8."""
+    from custom_components.heating_core.logic import MasterInput, master_target
+    g = G
+    m = MasterInput(comfort=22.8, current_temp=23.5, set_now=22.8, schedule_on=True, modulating=True)
+    assert master_target(g, m, []).target == 22.8
+    m2 = MasterInput(comfort=22.8, current_temp=23.5, set_now=22.8, schedule_on=True)
+    assert master_target(g, m2, []).target == g.eco  # Therme ohne Heizkurve: Zweipunkt wie bisher

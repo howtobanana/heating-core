@@ -20,6 +20,7 @@ class AdapterLimits:
     min_temp: float = 7.0
     max_temp: float = 30.0
     confirm_delay_s: float = 30 * 60
+    modulating: bool = False  # Anlage regelt selbst über Heizkurve: Sollwert halten, nicht takten
 
 
 class HeatingAdapter(Protocol):

@@ -327,6 +327,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             any_window_open=any_window,
             min_temp=lim.min_temp,
             max_temp=lim.max_temp,
+            modulating=lim.modulating,
             boost_enabled=bool(self.opt(OPT_BOOST_ENABLED)),
             boost_amount=float(self.opt(OPT_BOOST_AMOUNT)),
             boost_threshold=float(self.opt(OPT_BOOST_THRESHOLD)),

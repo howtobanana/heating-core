@@ -156,6 +156,8 @@ class MasterInput:
     humidity_enabled: bool = False
     humidity: float | None = None
     humidity_drop: float = 0.5
+    # Anlage mit eigener Heizkurve (Ökofen): Sollwert halten statt Zweipunkt, auf 0,1 K genau
+    modulating: bool = False
 
 
 @dataclass(frozen=True)
@@ -255,7 +257,7 @@ def master_target(
     else:
         base_raw = max(base_required - hum_drop, floor)
         eco_result = max(g.eco, floor)
-        if base_raw <= g.eco:
+        if base_raw <= g.eco or m.modulating:
             pure = base_raw
         elif m.set_now >= base_raw - 0.5:
             pure = eco_result if m.current_temp >= base_raw else base_raw
@@ -264,7 +266,8 @@ def master_target(
     pure = max(min(pure, m.max_temp), m.min_temp)
 
     final = pure + (m.boost_amount if boost_active else 0.0) + weather
-    final = round_half(max(min(final, m.max_temp), m.min_temp))
+    final = max(min(final, m.max_temp), m.min_temp)
+    final = round(final, 1) if m.modulating else round_half(final)
 
     if g.summer:
         state = "summer"
