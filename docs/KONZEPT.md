@@ -1,6 +1,6 @@
 # Heating Core – Konzept
 
-Stand 08.11.2026 · Karte HEATING-1 · Entwurf, wartet auf Fabians Freigabe
+Stand 08.11.2026 · Karte HEATING-1 · Fragen beantwortet, wartet auf Fabians Freigabe
 
 ## 1. Ziel und Grundsätze
 
@@ -93,8 +93,8 @@ Fußbodenheizung als eigener Ökofen-Heizkreis (Typ Fußboden).
 
 - Kreise: `climate.pellematic_heating_circuit_N_climate`, je Kreis Typ Heizkörper
   oder Fußboden (in der Einrichtung gewählt, steuert Trägheit, Hysterese, Vorheizzeit).
-- Sollwert: `number.pellematic_heating_circuit_N_remote_override` (Offset in K,
-  begrenzt), alternativ `*_temp_heat` / `*_temp_setback`.
+- Sollwert: nur über `number.pellematic_heating_circuit_N_remote_override` (Offset in K,
+  begrenzt); `*_temp_heat` / `*_temp_setback` bleiben unangetastet.
 - Betriebsart: `select.pellematic_heating_circuit_N_mode_auto` (auto/heizen/absenken/aus).
 - Pelletkessel: Mindestlaufzeit, längere Holds, größere Hysterese.
 
@@ -152,11 +152,11 @@ bestehenden Automation und füllt die Felder vor.
 Geofencing, Lüftung, System-Diagnose bleiben vorerst Blueprints (Entscheidung
 offen in HEATING-3). Warmwasser wird nicht gesteuert.
 
-## 10. Offene Fragen an Fabian
+## 10. Entscheidungen (Fabian, 08.11.2026)
 
-1. **Sonderfall Perg:** kommt mit Fabians Beschreibung in eine eigene Karte (HEATING-8);
-   für dieses Konzept nicht nötig.
-2. **Ökofen-Sollwert:** Steuern über den Offset `remote_override` (Empfehlung,
-   die Kessellogik bleibt aktiv) oder direkt über `temp_heat`/`temp_setback`?
-3. **Mindest-HA-Version:** Empfehlung 2026.10 (Wien und Perg laufen auf 2026.10.4), ältere nicht unterstützen.
-4. **Name in HACS / Domain:** `heating_core` („Heating Core“) – passt das?
+1. **Ökofen-Sollwert:** über den Offset `remote_override`. Die Kessellogik bleibt
+   aktiv; fällt HA aus, geht der Offset auf 0 und die Anlage heizt nach ihrem Programm.
+   `temp_heat` / `temp_setback` werden nicht verändert.
+2. **Mindest-HA-Version:** 2026.10.
+3. **Name:** Domain `heating_core`, Anzeige „Heating Core“.
+4. **Sonderfall Perg:** eigene Karte HEATING-8, wartet auf Fabians Beschreibung.
