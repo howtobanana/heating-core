@@ -239,6 +239,10 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         result: dict[str, Any] = {"globals": g, "circuits": {}}
         for cid, ccfg in self.circuits().items():
             result["circuits"][cid] = await self._circuit(cid, ccfg, g, now)
+        # Brennstoff (nur Ökofen): aus dem ersten Heizkreis mit Master abgeleitet
+        fuel = getattr(self.adapter, "fuel", None)
+        masters = [c[F_MASTER] for c in self.circuits().values() if c.get(F_MASTER)]
+        result["fuel_kg"] = fuel(masters[0]) if fuel and masters else None
         return result
 
     async def _circuit(self, cid: str, ccfg: dict, g: Globals, now: float) -> dict[str, Any]:

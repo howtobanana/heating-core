@@ -215,6 +215,9 @@
           "sensor_missing": "Sensor missing",
           "circuit_off": "Circuit off (by the system)"
         }
+      },
+      "fuel": {
+        "name": "Pellets"
       }
     },
     "binary_sensor": {

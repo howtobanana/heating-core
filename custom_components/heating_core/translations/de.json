@@ -215,6 +215,9 @@
           "sensor_missing": "Sensor fehlt",
           "circuit_off": "Kreis von der Anlage abgeschaltet"
         }
+      },
+      "fuel": {
+        "name": "Pellets"
       }
     },
     "binary_sensor": {

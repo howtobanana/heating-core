@@ -2,6 +2,7 @@
   "binary_sensor.perg_problem": {"state": "on", "attributes": {"probleme": ["Bad OG: sensor_missing"]}, "device": "Perg", "key": "problem"},
   "number.perg_eco": {"state": "19.0", "attributes": {"min": 10, "max": 23, "step": 0.5}, "device": "Perg", "key": "eco"},
   "number.perg_away_temperature": {"state": "16.0", "attributes": {"min": 10, "max": 23, "step": 0.5}, "device": "Perg", "key": "away_temp"},
+  "sensor.perg_pellets": {"state": "120", "attributes": {"unit_of_measurement": "kg"}, "device": "Perg", "key": "fuel"},
   "switch.perg_away": {"state": "off", "attributes": {}, "device": "Perg", "key": "away"},
   "switch.perg_guest": {"state": "off", "attributes": {}, "device": "Perg", "key": "guest"},
   "switch.perg_writing_enabled": {"state": "off", "attributes": {}, "device": "Perg", "key": "write_enabled"},

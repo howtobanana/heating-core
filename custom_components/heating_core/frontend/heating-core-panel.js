@@ -32,8 +32,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 
 // ---- Symbole fürs Schema (DIN-ähnlich) --------------------------------------
 const I = {
-  flame: (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><path fill="${HOT}" d="M0-14C7-7 10 0 6 7 4 11-4 11-6 7-9 1-4-3 0-14Z"/><path fill="#ffd54f" d="M0-2C3 1 4 4 2 7 1 8-1 8-2 7-4 4-2 2 0-2Z"/></g>`,
-  pump: (x, y, on) => `<g class="pump ${on ? "on" : ""}" transform="translate(${x} ${y})"><circle r="11"/><path d="M-5-6 7 0-5 6Z"/></g>`,
+  pump: (x, y, on) => `<g class="pump ${on ? "on" : ""}" transform="translate(${x} ${y})"><circle r="9"/><path d="M-3.5-4.5 5.5 0-3.5 4.5Z"/></g>`,
   valve: (x, y, open) => `<g class="valve ${open ? "open" : ""}" transform="translate(${x} ${y})"><path d="M-7-6 7 6V-6L-7 6Z"/></g>`,
   trv: (x, y, open) => `<g class="valve ${open ? "open" : ""}" transform="translate(${x} ${y})"><path d="M0 0V-9"/><rect x="-5" y="-15" width="10" height="6" rx="2"/><path d="M-7-6 7 6V-6L-7 6Z"/></g>`,
   radiator: (x, y, on) => `<g class="rad ${on ? "on" : ""}" transform="translate(${x} ${y})"><rect x="-10" y="-8" width="20" height="16" rx="2"/><path d="M-5-8v16M0-8v16M5-8v16"/></g>`,
@@ -56,12 +55,21 @@ class HeatingCorePanel extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    // HA reicht hass bei jeder Änderung irgendwo im Haus weiter; neu zeichnen nur, wenn sich bei
+    // Heating Core etwas ändert – sonst startet die Animation ständig neu und ruckelt.
+    if (hass.entities !== this._entObj) {
+      this._entObj = hass.entities;
+      this._ids = Object.values(hass.entities || {}).filter((e) => e.platform === "heating_core").map((e) => e.entity_id);
+    }
+    const sig = this._ids.map((id) => hass.states[id]?.last_updated).join("|") + this._narrow;
+    if (sig === this._sig) return;
     if (this._dragging || this._queued) return;
+    this._sig = sig;
     this._queued = true;
     requestAnimationFrame(() => { this._queued = false; this._render(); });
   }
 
-  set narrow(v) { this._narrow = v; }
+  set narrow(v) { this._narrow = v; if (this._hass) this.hass = this._hass; }
   set panel(v) { this._panel = v; }
 
   // ---- Daten -------------------------------------------------------------
@@ -149,28 +157,35 @@ class HeatingCorePanel extends HTMLElement {
       <b data-out="${id}">${fmt(st.state)} °C</b></label>`;
   }
 
-  _ring(ist, soll, tone) {
-    const lo = 14, hi = 28, f = (v) => Math.max(0, Math.min(1, (Number(v) - lo) / (hi - lo)));
+  // Drehregler wie die HA-Thermostat-Karte: Bogen = Ist, Knopf = Komfort (ziehbar), Mitte = Komfort groß.
+  _dial(ist, comfortId, tone) {
+    const st = this._st(comfortId);
+    const a = st?.attributes || {}, lo = Number(a.min ?? 16), hi = Number(a.max ?? 26);
+    const f = (v) => Math.max(0, Math.min(1, (Number(v) - lo) / (hi - lo)));
     const C = 2 * Math.PI * 40, arc = C * 0.75;
-    const sa = (-225 + 270 * f(soll)) * (Math.PI / 180);
-    return `<svg class="ring ${tone}" viewBox="0 0 100 100" role="img" aria-label="Ist ${fmt(ist)} °C, Soll ${fmt(soll)} °C">
+    const knob = (v) => { const r = (135 + 270 * f(v)) * (Math.PI / 180); return [50 + 40 * Math.cos(r), 50 + 40 * Math.sin(r)]; };
+    const [kx, ky] = st ? knob(st.state) : [0, 0];
+    return `<svg class="ring ${tone} ${st ? "dial" : ""}" viewBox="0 0 100 100" ${st ? `data-dial="${comfortId}" data-lo="${lo}" data-hi="${hi}" data-step="${a.step || 0.5}"` : ""}
+        role="${st ? "slider" : "img"}" ${st ? `tabindex="0"` : ""} aria-label="Komfort" aria-valuemin="${lo}" aria-valuemax="${hi}" aria-valuenow="${st?.state ?? ""}">
       <circle class="track" cx="50" cy="50" r="40" stroke-dasharray="${arc} ${C}" transform="rotate(135 50 50)"/>
       <circle class="val" cx="50" cy="50" r="40" stroke-dasharray="${has(ist) ? arc * f(ist) : 0} ${C}" transform="rotate(135 50 50)"/>
-      ${has(soll) ? `<circle class="mark" cx="${50 + 40 * Math.cos(sa)}" cy="${50 + 40 * Math.sin(sa)}" r="5"/>` : ""}
-      <text x="50" y="53" class="rv">${has(ist) ? fmt(ist) + "°" : "–"}</text><text x="50" y="69" class="rs">Soll ${fmt(soll)}°</text></svg>`;
+      ${st ? `<circle class="mark" cx="${kx}" cy="${ky}" r="6.5"/>` : ""}
+      <text x="50" y="52" class="rv">${st ? fmt(st.state) + "°" : has(ist) ? fmt(ist) + "°" : "–"}</text>
+      <text x="50" y="67" class="rs">${st ? `Ist ${fmt(ist)}°` : "Ist"}</text></svg>`;
   }
 
   _tile({ name, ist, soll, mode, problem, ent, note, iconSvg }) {
     const tone = this._tone(mode, problem);
     const comfort = this._st(ent.comfort);
     const presence = this._on(ent.presence);
+    const now = has(soll) ? ` · jetzt ${fmt(soll)}°` : "";
     return `<div class="tile ${tone}">
       <div class="tname">${iconSvg || ""}<span>${esc(name)}</span>${presence ? '<span class="dot" title="Präsenz">●</span>' : ""}</div>
-      ${this._ring(ist, soll, tone)}
-      <div class="tmode">${esc(problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–")}</div>
+      ${this._dial(ist, ent.comfort, tone)}
+      <div class="tmode">${esc((problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–") + now)}</div>
       ${note ? `<div class="note">${esc(note)}</div>` : ""}
       ${comfort ? `<div class="stepper"><button data-step="${ent.comfort}" data-d="-1" aria-label="Komfort niedriger">−</button>
-        <span>Komfort<b>${fmt(comfort.state)}°</b></span>
+        <span>Komfort</span>
         <button data-step="${ent.comfort}" data-d="1" aria-label="Komfort höher">+</button></div>` : ""}
       ${ent.pre_heat ? `<button class="chip ${this._on(ent.pre_heat) ? "on" : ""}" data-toggle="${ent.pre_heat}">Vorheizen</button>` : ""}
     </div>`;
@@ -178,7 +193,7 @@ class HeatingCorePanel extends HTMLElement {
 
   // ---- Schema: Kessel → Verteiler (Vorlauf/Rücklauf) → Pumpe → Heizkreis → Räume ----
 
-  _schema(info, narrow) {
+  _schema(info, narrow, fuel) {
     if (!info.length) return "";
     const kessel = info.find((i) => i.floor)?.t.kessel_temperatur;
     const W = narrow ? 360 : 820;
@@ -235,11 +250,12 @@ class HeatingCorePanel extends HTMLElement {
           ${z.problem ? I.warn(rx2 - 16, z.y) : ""}`;
       }
     }
-    const bx = narrow ? boiler.x + 54 : boiler.x + boiler.w / 2;
+    const bx = narrow ? boiler.x + 18 : boiler.x + boiler.w / 2;
+    const pellets = has(fuel) ? `Pellets ${Number(fuel).toLocaleString("de-AT")} kg` : "";
     s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>
-      ${narrow ? I.flame(boiler.x + 28, boiler.y + 33, 1.2) : I.flame(bx, boiler.y + 30, 1.4)}
-      <text class="t ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 28 : boiler.y + 66}">Wärmeerzeuger</text>
-      <text class="big ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 50 : boiler.y + 96}">${has(kessel) ? fmt(kessel, 0) + " °C" : ""}</text>` + s;
+      <text class="s ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 24 : boiler.y + 34}">${has(fuel) ? "Pelletkessel" : "Wärmeerzeuger"}</text>
+      <text class="big ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 48 : boiler.y + 66}">${has(kessel) ? fmt(kessel, 0) + " °C" : "–"}</text>
+      ${pellets ? `<text class="t sm ${narrow ? "end" : "mid"}" x="${narrow ? boiler.x + boiler.w - 16 : bx}" y="${narrow ? boiler.y + 38 : boiler.y + 94}">${pellets}</text>` : ""}` + s;
     return `<svg class="schema ${narrow ? "" : "wide"}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Anlagenschema">${s}</svg>`;
   }
 
@@ -301,10 +317,39 @@ class HeatingCorePanel extends HTMLElement {
         </div>
       </div>
       ${problems.length ? `<div class="alert">${icon(I.warn, false, 20, 20)}<span>${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => " – " + (PROBLEMS[k] || k)))).join("<br>")}</span></div>` : ""}
-      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow)}${this._legend()}</section>
+      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel)?.state)}${this._legend()}</section>
       ${info.map((i) => this._circuitGroup(i)).join("")}
       <section class="card"><h2>Grundwerte</h2>${this._slider(s.eco, "Eco")}${this._slider(s.away_temp, "Abwesend")}</section>
     </div>`;
+  }
+
+  _wireDial(svg) {
+    const { dial: id, lo, hi, step } = svg.dataset;
+    const [min, max, st] = [Number(lo), Number(hi), Number(step)];
+    const knob = svg.querySelector(".mark"), label = svg.querySelector(".rv");
+    let value = null;
+    const at = (e) => {
+      const r = svg.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * 100 - 50, y = ((e.clientY - r.top) / r.height) * 100 - 50;
+      let d = ((Math.atan2(y, x) * 180) / Math.PI - 135 + 720) % 360;
+      if (d > 270) d = d > 315 ? 0 : 270; // Lücke unten: zum nächsten Ende
+      value = Math.round((min + (d / 270) * (max - min)) / st) * st;
+      const rad = (135 + (270 * (value - min)) / (max - min)) * (Math.PI / 180);
+      knob.setAttribute("cx", 50 + 40 * Math.cos(rad));
+      knob.setAttribute("cy", 50 + 40 * Math.sin(rad));
+      label.textContent = `${fmt(value)}°`;
+    };
+    svg.addEventListener("pointerdown", (e) => { this._dragging = true; svg.setPointerCapture(e.pointerId); at(e); });
+    svg.addEventListener("pointermove", (e) => { if (svg.hasPointerCapture(e.pointerId)) at(e); });
+    const done = () => {
+      if (!this._dragging) return;
+      this._dragging = false;
+      if (value !== null && value !== Number(this._st(id)?.state)) this._setNumber(id, value);
+      else this.hass = this._hass;
+    };
+    svg.addEventListener("pointerup", done);
+    svg.addEventListener("pointercancel", done);
+    svg.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowRight") this._step(id, 1); if (e.key === "ArrowDown" || e.key === "ArrowLeft") this._step(id, -1); });
   }
 
   _render() {
@@ -319,6 +364,7 @@ class HeatingCorePanel extends HTMLElement {
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => this._toggle(b.dataset.toggle)));
     this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d))));
+    this.shadowRoot.querySelectorAll("[data-dial]").forEach((svg) => this._wireDial(svg));
     this.shadowRoot.querySelectorAll("[data-number]").forEach((inp) => {
       const out = this.shadowRoot.querySelector(`[data-out="${inp.dataset.number}"]`);
       inp.addEventListener("pointerdown", () => { this._dragging = true; });
@@ -353,17 +399,17 @@ const CSS = `
   .schema { display:block; width: 100%; height: auto; } .schema.wide { max-width: 980px; margin: 0 auto; }
   .schema .box { fill: var(--card-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
   .schema .box.hot { stroke: ${HOT}; } .schema .box.warnbox { stroke: ${WARN}; stroke-dasharray: 4 3; }
-  .schema .boiler { fill: ${HOT}14; stroke: ${HOT}88; }
-  .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; }
+  .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; }
+  .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; } .schema .end { text-anchor: end; }
   .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
   .schema .s { font-size: 12px; fill: var(--secondary-text-color); }
   .schema .big { font-size: 20px; font-weight: 600; fill: var(--primary-text-color); }
-  .schema .pipe { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; } .schema .pipe.thin { stroke-width: 3.5; }
-  .schema .pipe.flow { stroke-dasharray: 10 8; animation: flow 1.2s linear infinite; } .schema .pipe.flow.back { animation-direction: reverse; }
-  .schema .halo { fill: none; stroke: var(--card-background-color); stroke-width: 11; }
-  @keyframes flow { to { stroke-dashoffset: -18; } }
+  .schema .pipe { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .schema .pipe.thin { stroke-width: 2.2; }
+  .schema .pipe.flow { stroke-dasharray: 7 6; animation: flow 1s linear infinite; } .schema .pipe.flow.back { animation-direction: reverse; }
+  .schema .halo { fill: none; stroke: var(--card-background-color); stroke-width: 8; }
+  @keyframes flow { to { stroke-dashoffset: -13; } }
   @media (prefers-reduced-motion: reduce) { .schema .pipe.flow { animation: none; } }
-  .pump circle { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 2; } .pump path { fill: ${IDLE}; }
+  .pump circle { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.6; } .pump path { fill: ${IDLE}; }
   .pump.on circle { stroke: ${HOT}; } .pump.on path { fill: ${HOT}; }
   .valve rect { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.5; } .valve.open rect { stroke: ${HOT}; }
   .valve path { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.8; stroke-linejoin: round; } .valve.open path { fill: ${HOT}; stroke: ${HOT}; }
@@ -384,7 +430,8 @@ const CSS = `
   .ring { width: 120px; height: 120px; } .ring circle { fill: none; stroke-width: 9; stroke-linecap: round; }
   .ring .track { stroke: var(--secondary-background-color); } .ring .val { stroke: ${IDLE}; }
   .ring.hot .val { stroke: ${HOT}; } .ring.eco .val { stroke: ${COLD}; } .ring.warn .val { stroke: ${WARN}; }
-  .ring .mark { fill: var(--card-background-color); stroke: var(--primary-text-color); stroke-width: 2.5; }
+  .ring .mark { fill: #fff; stroke: none; filter: drop-shadow(0 1px 2px #0006); }
+  .ring.dial { touch-action: none; cursor: grab; } .ring.dial:active { cursor: grabbing; }
   .ring text { text-anchor: middle; fill: var(--primary-text-color); } .ring .rv { font-size: 22px; font-weight: 600; } .ring .rs { font-size: 10px; fill: var(--secondary-text-color); }
   .tmode { font-size: 13px; font-weight: 500; text-align: center; } .note { font-size: 12px; color: var(--secondary-text-color); text-align: center; }
   .bigtemp { font-size: 44px; font-weight: 600; color: ${HOT}; padding: 22px 0 10px; }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfMass, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -13,6 +13,8 @@ from .entity import HeatingEntity
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
+    if entry.data.get("manufacturer") == "oekofen":
+        async_add_entities([Fuel(coordinator)])
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT:
             async_add_entities([CircuitTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, True)], config_subentry_id=sid)
@@ -106,3 +108,18 @@ class Mode(HeatingEntity, SensorEntity):
     def native_value(self):
         d = _find(self.coordinator, self._sid, self._circuit)
         return d.get("mode") if d.get("mode") in MODES else None
+
+
+class Fuel(HeatingEntity, SensorEntity):
+    """Pelletlager der Anlage (Ökofen), für die Seite „Heizung“."""
+
+    _attr_device_class = SensorDeviceClass.WEIGHT
+    _attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
+    _attr_translation_key = "fuel"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "fuel")
+
+    @property
+    def native_value(self):
+        return (self.coordinator.data or {}).get("fuel_kg")

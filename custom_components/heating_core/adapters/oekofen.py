@@ -38,6 +38,11 @@ class OekofenAdapter:
         st = self.hass.states.get(entity_id)
         return _float(st.state) if st else None
 
+    def fuel(self, master_entity: str) -> float | None:
+        """Pelletlager in kg: climate.pellematic_heating_circuit_1_climate -> sensor.pellematic_pellematic_1_l_storage_fill"""
+        prefix = circuit_base(master_entity).split("_heating_circuit")[0]
+        return self._num(f"sensor.{prefix}_pellematic_1_l_storage_fill")
+
     def read(self, master_entity: str) -> CircuitState:
         st = self.hass.states.get(master_entity)
         if st is None or st.state in ("unavailable", "unknown"):
