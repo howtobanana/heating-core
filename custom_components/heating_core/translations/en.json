@@ -162,6 +162,11 @@
       "write_enabled": {
         "name": "Writing enabled"
       }
+    },
+    "sensor": {
+      "target": {
+        "name": "Setpoint"
+      }
     }
   }
 }

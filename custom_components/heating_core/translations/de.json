@@ -162,6 +162,11 @@
       "write_enabled": {
         "name": "Schreiben aktiv"
       }
+    },
+    "sensor": {
+      "target": {
+        "name": "Sollwert"
+      }
     }
   }
 }

@@ -25,9 +25,9 @@ class _Target(HeatingEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
     def __init__(self, coordinator, sid: str, title: str) -> None:
-        super().__init__(coordinator, f"{sid}_target")
+        super().__init__(coordinator, f"{sid}_target", sid, title)
         self._sid = sid
-        self._attr_name = f"{title} Sollwert"
+        self._attr_translation_key = "target"
 
 
 class CircuitTarget(_Target):
