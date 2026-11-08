@@ -1,5 +1,6 @@
 // Heating Core – eigene Seite „Heizung“ (HEATING-9) mit animiertem Anlagenschema (HEATING-10).
 // Liest nur Entitäten der Integration heating_core; schaltet über normale HA-Dienste.
+// Aufbau (Entwurf „A mit Kacheln aus B“, Fabian 08.11.2026): Status, Schema mit Legende, je Heizkreis Kacheln.
 
 const MODES = {
   eco: "Eco", presence: "Präsenz", schedule: "Zeitplan", pre_heat: "Vorheizen",
@@ -22,9 +23,29 @@ const PROBLEMS = {
   source_temperature_unknown: "Kesseltemperatur unbekannt",
 };
 const HEATING = new Set(["presence", "schedule", "pre_heat", "manual", "boost", "floor_heating"]);
+const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable"]);
+const HOT = "#f4511e", COLD = "#1e88e5", IDLE = "#9aa5b1", WARN = "#f5a623";
 
-const fmt = (v, d = 1) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? "–" : Number(v).toFixed(d));
+const has = (v) => v !== null && v !== undefined && v !== "" && !isNaN(Number(v));
+const fmt = (v, d = 1) => (has(v) ? Number(v).toLocaleString("de-AT", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// ---- Symbole fürs Schema (DIN-ähnlich) --------------------------------------
+const I = {
+  flame: (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><path fill="${HOT}" d="M0-14C7-7 10 0 6 7 4 11-4 11-6 7-9 1-4-3 0-14Z"/><path fill="#ffd54f" d="M0-2C3 1 4 4 2 7 1 8-1 8-2 7-4 4-2 2 0-2Z"/></g>`,
+  pump: (x, y, on) => `<g class="pump ${on ? "on" : ""}" transform="translate(${x} ${y})"><circle r="11"/><path d="M-5-6 7 0-5 6Z"/></g>`,
+  valve: (x, y, open) => `<g class="valve ${open ? "open" : ""}" transform="translate(${x} ${y})"><path d="M-7-6 7 6V-6L-7 6Z"/></g>`,
+  trv: (x, y, open) => `<g class="valve ${open ? "open" : ""}" transform="translate(${x} ${y})"><path d="M0 0V-9"/><rect x="-5" y="-15" width="10" height="6" rx="2"/><path d="M-7-6 7 6V-6L-7 6Z"/></g>`,
+  radiator: (x, y, on) => `<g class="rad ${on ? "on" : ""}" transform="translate(${x} ${y})"><rect x="-10" y="-8" width="20" height="16" rx="2"/><path d="M-5-8v16M0-8v16M5-8v16"/></g>`,
+  floor: (x, y, on) => `<g class="rad ${on ? "on" : ""}" transform="translate(${x} ${y})"><path d="M-10-7H7a2.5 2.5 0 0 1 0 5H-7a2.5 2.5 0 0 0 0 5H7a2.5 2.5 0 0 1 0 5H-10"/></g>`,
+  warn: (x, y) => `<g transform="translate(${x} ${y})"><path fill="${WARN}" d="M0-8 8 7H-8Z"/><path stroke="#000" stroke-width="1.6" d="M0-3v5M0 4.5v.5"/></g>`,
+};
+const icon = (fn, on, w = 26, h = 22) => `<svg width="${w}" height="${h}" viewBox="${-w / 2} ${-h / 2} ${w} ${h}">${fn(0, 0, on)}</svg>`;
+const elbow = (x1, y1, xm, x2, y2) => {
+  if (Math.abs(y2 - y1) < 1) return `M${x1} ${y1}H${x2}`;
+  const r = Math.min(8, Math.abs(y2 - y1) / 2), s = y2 > y1 ? 1 : -1;
+  return `M${x1} ${y1}H${xm - r}Q${xm} ${y1} ${xm} ${y1 + s * r}V${y2 - s * r}Q${xm} ${y2} ${xm + r} ${y2}H${x2}`;
+};
 
 class HeatingCorePanel extends HTMLElement {
   constructor() {
@@ -69,6 +90,25 @@ class HeatingCorePanel extends HTMLElement {
   _a(id) { return this._st(id)?.attributes || {}; }
   _on(id) { return this._st(id)?.state === "on"; }
 
+  // Was die Anlage meldet, aufbereitet für Schema und Kacheln. Wärme „fließt“ nur, wenn Pumpe/Ventil es melden
+  // bzw. ein Heizkreis an ist und Ist < Soll – einen echten Durchfluss misst keine Anlage.
+  _info(sys) {
+    return sys.circuits.map((c) => {
+      const t = this._a(c.ent.target);
+      const mode = this._st(c.ent.mode)?.state;
+      const soll = this._st(c.ent.target)?.state;
+      const floor = has(t.kessel_temperatur);
+      const flow = floor ? !!t.pumpe_ist : !OFF_MODES.has(mode) && Number(t.ist_temperatur) < Number(soll);
+      const rooms = c.rooms.map((r) => {
+        const rt = this._a(r.ent.target);
+        const zone = rt.ventile_offen !== undefined && rt.ventile_offen !== null;
+        return { ent: r.ent, name: r.name, t: rt, zone, mode: this._st(r.ent.mode)?.state, soll: this._st(r.ent.target)?.state,
+          ist: rt.ist_temperatur, problem: rt.problem, flow: zone ? !!t.pumpe_ist && rt.ventile_offen : flow && rt.waermebedarf !== false };
+      });
+      return { ent: c.ent, name: c.name, t, mode, soll, ist: t.ist_temperatur, floor, flow, rooms, problem: t.problem };
+    });
+  }
+
   // ---- Aktionen ----------------------------------------------------------
 
   _toggle(id) {
@@ -79,7 +119,26 @@ class HeatingCorePanel extends HTMLElement {
     this._hass.callService("number", "set_value", { entity_id: id, value: Number(value) });
   }
 
-  // ---- Darstellung -------------------------------------------------------
+  _step(id, dir) {
+    const st = this._st(id);
+    if (!st) return;
+    const a = st.attributes, step = Number(a.step) || 0.5;
+    const v = Math.min(Number(a.max), Math.max(Number(a.min), Math.round((Number(st.state) + dir * step) / step) * step));
+    if (v !== Number(st.state)) this._setNumber(id, v);
+  }
+
+  // ---- Bausteine ---------------------------------------------------------
+
+  _tone(mode, problem) {
+    if (problem) return "warn";
+    if (HEATING.has(mode)) return "hot";
+    if (mode === "eco" || mode === "floor_idle") return "eco";
+    return "off";
+  }
+
+  _badge(mode, problem) {
+    return `<span class="badge ${this._tone(mode, problem)}">${esc(problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–")}</span>`;
+  }
 
   _slider(id, label) {
     const st = this._st(id);
@@ -90,104 +149,161 @@ class HeatingCorePanel extends HTMLElement {
       <b data-out="${id}">${fmt(st.state)} °C</b></label>`;
   }
 
-  _chip(id, label, onClass = "on") {
-    if (!id) return "";
-    return `<button class="chip ${this._on(id) ? onClass : ""}" data-toggle="${id}">${esc(label)}</button>`;
+  _ring(ist, soll, tone) {
+    const lo = 14, hi = 28, f = (v) => Math.max(0, Math.min(1, (Number(v) - lo) / (hi - lo)));
+    const C = 2 * Math.PI * 40, arc = C * 0.75;
+    const sa = (-225 + 270 * f(soll)) * (Math.PI / 180);
+    return `<svg class="ring ${tone}" viewBox="0 0 100 100" role="img" aria-label="Ist ${fmt(ist)} °C, Soll ${fmt(soll)} °C">
+      <circle class="track" cx="50" cy="50" r="40" stroke-dasharray="${arc} ${C}" transform="rotate(135 50 50)"/>
+      <circle class="val" cx="50" cy="50" r="40" stroke-dasharray="${has(ist) ? arc * f(ist) : 0} ${C}" transform="rotate(135 50 50)"/>
+      ${has(soll) ? `<circle class="mark" cx="${50 + 40 * Math.cos(sa)}" cy="${50 + 40 * Math.sin(sa)}" r="5"/>` : ""}
+      <text x="50" y="53" class="rv">${has(ist) ? fmt(ist) + "°" : "–"}</text><text x="50" y="69" class="rs">Soll ${fmt(soll)}°</text></svg>`;
   }
 
-  _room(r) {
-    const t = this._a(r.ent.target);
-    const mode = this._st(r.ent.mode)?.state;
-    const valves = t.ventile_offen === undefined || t.ventile_offen === null ? "" :
-      `<span class="tag ${t.ventile_offen ? "hot" : ""}">Ventile ${t.ventile_offen ? "offen" : "zu"}</span>`;
-    return `<div class="room">
-      <div class="row"><b>${esc(r.name)}</b><span class="mode ${HEATING.has(mode) ? "hot" : ""}">${esc(MODES[mode] || mode || "–")}</span></div>
-      <div class="row small">Ist <b>${fmt(t.ist_temperatur)} °C</b> · Soll <b>${fmt(this._st(r.ent.target)?.state)} °C</b>
-        ${this._on(r.ent.presence) ? '<span class="tag">Präsenz</span>' : ""} ${valves}
-        ${t.problem ? `<span class="tag warn">${esc(PROBLEMS[t.problem] || t.problem)}</span>` : ""}</div>
-      ${this._slider(r.ent.comfort, "Komfort")}
-      ${r.ent.pre_heat ? `<div class="row">${this._chip(r.ent.pre_heat, "Vorheizen")}</div>` : ""}
+  _tile({ name, ist, soll, mode, problem, ent, note, iconSvg }) {
+    const tone = this._tone(mode, problem);
+    const comfort = this._st(ent.comfort);
+    const presence = this._on(ent.presence);
+    return `<div class="tile ${tone}">
+      <div class="tname">${iconSvg || ""}<span>${esc(name)}</span>${presence ? '<span class="dot" title="Präsenz">●</span>' : ""}</div>
+      ${this._ring(ist, soll, tone)}
+      <div class="tmode">${esc(problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–")}</div>
+      ${note ? `<div class="note">${esc(note)}</div>` : ""}
+      ${comfort ? `<div class="stepper"><button data-step="${ent.comfort}" data-d="-1" aria-label="Komfort niedriger">−</button>
+        <span>Komfort<b>${fmt(comfort.state)}°</b></span>
+        <button data-step="${ent.comfort}" data-d="1" aria-label="Komfort höher">+</button></div>` : ""}
+      ${ent.pre_heat ? `<button class="chip ${this._on(ent.pre_heat) ? "on" : ""}" data-toggle="${ent.pre_heat}">Vorheizen</button>` : ""}
     </div>`;
   }
 
-  _circuit(c) {
-    const st = this._st(c.ent.target);
-    const t = st.attributes;
-    const mode = this._st(c.ent.mode)?.state;
-    const floor = t.kessel_temperatur !== undefined && t.kessel_temperatur !== null;
-    const would = (t.wuerde_schalten || []).length ? `<ul class="would">${t.wuerde_schalten.map((w) => `<li>${esc(w.replace("switch.", ""))}</li>`).join("")}</ul>` : "";
-    const details = floor
-      ? `<div class="row small">Kessel <b>${fmt(t.kessel_temperatur)} °C</b> · Freigabe <b>${t.kessel_freigabe ? "ja" : "nein"}</b> ·
-           Pumpe <b>${t.pumpe_ist ? "läuft" : "aus"}</b>${t.pumpe_soll !== t.pumpe_ist ? ` → soll ${t.pumpe_soll ? "laufen" : "aus"}` : ""}</div>
-         ${would ? `<div class="small">Würde schalten:</div>${would}` : '<div class="small muted">Würde nichts schalten.</div>'}`
-      : `<div class="big"><span>${fmt(t.ist_temperatur)} °C</span><small>Ist</small><span>→</span><span>${fmt(st.state)} °C</span><small>Soll</small></div>
-         <div class="row small">Anlage meldet <b>${fmt(t.anlage_sollwert)} °C</b> · ${esc(DECISIONS[t.entscheidung] || t.entscheidung || "")}
-         ${t.schreib_budget_rest !== undefined && t.schreib_budget_rest !== null ? ` · Budget ${t.schreib_budget_rest}` : ""}</div>`;
-    return `<section class="card">
-      <div class="row"><h2>${esc(c.name)}</h2><span class="mode ${HEATING.has(mode) ? "hot" : ""}">${esc(MODES[mode] || mode || "–")}</span></div>
-      ${t.problem ? `<div class="warnbox">${esc(PROBLEMS[t.problem] || t.problem)}</div>` : ""}
-      ${details}
-      ${this._slider(c.ent.comfort, "Komfort")}
-      ${c.ent.pre_heat ? `<div class="row">${this._chip(c.ent.pre_heat, "Vorheizen")}</div>` : ""}
-      ${c.rooms.length ? `<div class="rooms">${c.rooms.map((r) => this._room(r)).join("")}</div>` : ""}
+  // ---- Schema: Kessel → Verteiler (Vorlauf/Rücklauf) → Pumpe → Heizkreis → Räume ----
+
+  _schema(info, narrow) {
+    if (!info.length) return "";
+    const kessel = info.find((i) => i.floor)?.t.kessel_temperatur;
+    const W = narrow ? 360 : 820;
+    const L = narrow
+      ? { rl: 22, vl: 36, pump: 62, box: [84, 344], room: [130, 344], branch: 106, valve: 118, step: 52 }
+      : { rl: 178, vl: 194, pump: 232, box: [262, 470], room: [560, 804], branch: 500, valve: 530, step: 56 };
+    let y = narrow ? 104 : 8;
+    const rows = info.map((i) => {
+      const n = i.rooms.length;
+      let cy, rooms;
+      if (narrow) {
+        cy = y + 24;
+        rooms = i.rooms.map((r, k) => ({ ...r, y: cy + 58 + k * L.step }));
+        y = cy + 30 + (n ? n * L.step + 18 : 18);
+      } else {
+        const h = Math.max(1, n) * L.step + 20;
+        cy = y + h / 2;
+        rooms = i.rooms.map((r, k) => ({ ...r, y: cy - ((n - 1) * L.step) / 2 + k * L.step }));
+        y += h;
+      }
+      return { ...i, cy, rooms };
+    });
+    const top = rows[0].cy, bottom = rows[rows.length - 1].cy;
+    const any = rows.some((r) => r.flow);
+    const boiler = narrow ? { x: 12, y: 12, w: 336, h: 64 } : { x: 16, y: Math.max(8, (top + bottom) / 2 - 60), w: 136, h: 120 };
+    const H = Math.max(y, boiler.y + boiler.h) + 8;
+    const pipe = (on, back, color, d, thin) => `<path class="pipe ${thin ? "thin" : ""} ${on ? "flow" : ""} ${back ? "back" : ""}" style="stroke:${on ? color : IDLE}" d="${d}"/>`;
+    const barTop = boiler.y + boiler.h;
+    const rlA = narrow ? barTop : Math.min(top + 6, boiler.y + 74), rlB = narrow ? bottom + 6 : Math.max(bottom + 6, boiler.y + 74);
+    const vlA = narrow ? barTop : Math.min(top - 6, boiler.y + 46), vlB = narrow ? bottom - 6 : Math.max(bottom - 6, boiler.y + 46);
+    // Rücklauf zuerst, Vorlauf mit Halo darüber: so bleiben Kreuzungen sauber lesbar
+    let s = pipe(any, true, COLD, `M${L.rl} ${rlA}V${rlB}`);
+    if (!narrow) s += pipe(any, true, COLD, `M${boiler.x + boiler.w} ${boiler.y + 74}H${L.rl}`);
+    for (const r of rows) s += pipe(r.flow, true, COLD, `M${L.rl} ${r.cy + 6}H${L.box[0]}`);
+    s += `<path class="halo" d="M${L.vl} ${vlA}V${vlB}"/>` + pipe(any, false, HOT, `M${L.vl} ${vlA}V${vlB}`);
+    if (!narrow) s += `<path class="halo" d="M${boiler.x + boiler.w} ${boiler.y + 46}H${L.vl}"/>` + pipe(any, false, HOT, `M${boiler.x + boiler.w} ${boiler.y + 46}H${L.vl}`);
+    for (const r of rows) {
+      const [bx, bx2] = L.box;
+      const sub = r.floor ? `Pumpe ${r.t.pumpe_ist ? "läuft" : "aus"}${r.t.pumpe_soll !== r.t.pumpe_ist && r.t.pumpe_soll != null ? ` · würde ${r.t.pumpe_soll ? "ein" : "aus"}schalten` : ""}` : `${fmt(r.ist)} → ${fmt(r.soll)} °C`;
+      s += pipe(r.flow, false, HOT, `M${L.vl} ${r.cy - 6}H${bx}`) + I.pump(L.pump, r.cy - 6, r.flow);
+      s += `<rect class="box ${r.flow ? "hot" : ""} ${r.problem ? "warnbox" : ""}" x="${bx}" y="${r.cy - 24}" width="${bx2 - bx}" height="48" rx="12"/>
+        <text class="t" x="${bx + 14}" y="${r.cy - 4}">${esc(r.name)}</text>
+        <text class="s" x="${bx + 14}" y="${r.cy + 14}">${esc(sub)}</text>`;
+      for (const z of r.rooms) {
+        const d = narrow ? `M${L.branch} ${r.cy + 24}V${z.y - 8}Q${L.branch} ${z.y} ${L.branch + 8} ${z.y}H${L.room[0]}` : elbow(bx2, r.cy, L.branch, L.room[0], z.y);
+        const [rx, rx2] = L.room;
+        const info2 = z.problem ? PROBLEMS[z.problem] || z.problem : `${fmt(z.ist)} → ${fmt(z.soll)} °C`;
+        const extra = z.zone ? (z.t.ventile_offen ? " · Ventil offen" : " · Ventil zu") : has(z.t.trv_sollwert) ? ` · TRV ${fmt(z.t.trv_sollwert)}` : "";
+        s += pipe(z.flow, false, HOT, d, true) + (z.zone ? I.valve : I.trv)(L.valve, z.y, z.flow);
+        s += `<rect class="box ${z.flow ? "hot" : ""} ${z.problem ? "warnbox" : ""}" x="${rx}" y="${z.y - 21}" width="${rx2 - rx}" height="42" rx="10"/>
+          ${z.zone ? I.floor(rx + 20, z.y, z.flow) : I.radiator(rx + 20, z.y, z.flow)}
+          <text class="t sm" x="${rx + 40}" y="${z.y - 3}">${esc(z.name)}</text>
+          <text class="s" x="${rx + 40}" y="${z.y + 13}">${esc(info2 + extra)}</text>
+          ${z.problem ? I.warn(rx2 - 16, z.y) : ""}`;
+      }
+    }
+    const bx = narrow ? boiler.x + 54 : boiler.x + boiler.w / 2;
+    s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>
+      ${narrow ? I.flame(boiler.x + 28, boiler.y + 33, 1.2) : I.flame(bx, boiler.y + 30, 1.4)}
+      <text class="t ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 28 : boiler.y + 66}">Wärmeerzeuger</text>
+      <text class="big ${narrow ? "" : "mid"}" x="${bx}" y="${narrow ? boiler.y + 50 : boiler.y + 96}">${has(kessel) ? fmt(kessel, 0) + " °C" : ""}</text>` + s;
+    return `<svg class="schema ${narrow ? "" : "wide"}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Anlagenschema">${s}</svg>`;
+  }
+
+  _legend() {
+    return `<div class="legend">
+      <span><i class="ln" style="background:${HOT}"></i>Vorlauf warm</span>
+      <span><i class="ln" style="background:${COLD}"></i>Rücklauf</span>
+      <span><i class="ln" style="background:${IDLE}"></i>steht</span>
+      <span>${icon(I.pump, true, 24, 24)}Pumpe läuft</span>
+      <span>${icon(I.valve, true, 20, 16)}Ventil offen</span>
+      <span>${icon(I.valve, false, 20, 16)}zu</span>
+      <span>${icon(I.trv, true, 20, 32)}Thermostat-Ventil</span>
+      <span>${icon(I.radiator, true, 24, 20)}Heizkörper</span>
+      <span>${icon(I.floor, true, 24, 20)}Fußboden</span>
+    </div>`;
+  }
+
+  // ---- Seite -------------------------------------------------------------
+
+  _circuitGroup(i) {
+    const t = i.t;
+    const meta = i.floor
+      ? `Kessel ${fmt(t.kessel_temperatur, 0)} °C · Freigabe ${t.kessel_freigabe ? "ja" : "nein"}`
+      : `Anlage meldet ${fmt(t.anlage_sollwert)} °C · ${DECISIONS[t.entscheidung] || t.entscheidung || ""}${has(t.schreib_budget_rest) ? ` · Budget ${t.schreib_budget_rest}` : ""}`;
+    const would = (t.wuerde_schalten || []).map((w) => esc(w.replace("switch.", ""))).join(", ");
+    const tiles = [];
+    if (i.floor) {
+      tiles.push(`<div class="tile ${i.flow ? "hot" : "off"}"><div class="tname">${icon(I.pump, i.flow)}<span>Kessel & Pumpe</span></div>
+        <div class="bigtemp">${fmt(t.kessel_temperatur, 0)}°</div><div class="tmode">Pumpe ${t.pumpe_ist ? "läuft" : "aus"}</div>
+        <div class="note">${t.pumpe_soll !== t.pumpe_ist && t.pumpe_soll != null ? `würde ${t.pumpe_soll ? "ein" : "aus"}schalten` : `Freigabe ${t.kessel_freigabe ? "ja" : "nein"}`}</div>
+        ${i.ent.pre_heat ? `<button class="chip ${this._on(i.ent.pre_heat) ? "on" : ""}" data-toggle="${i.ent.pre_heat}">Vorheizen</button>` : ""}</div>`);
+    } else {
+      tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow) }));
+    }
+    for (const z of i.rooms) {
+      tiles.push(this._tile({ ...z, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) ? `Thermostat ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
+    }
+    return `<section class="group">
+      <div class="ghead"><h2>${esc(i.name)}</h2>${this._badge(i.mode, i.problem)}</div>
+      <div class="gmeta">${esc(meta)}</div>
+      ${i.problem ? `<div class="alert">${esc(PROBLEMS[i.problem] || i.problem)}</div>` : ""}
+      ${would ? `<div class="would">Würde schalten: ${would}</div>` : ""}
+      <div class="tiles">${tiles.join("")}</div>
     </section>`;
   }
 
-  _schema(sys) {
-    // HEATING-10: Wärmeerzeuger → Kreise → Zonen; Leitung läuft (animiert), wenn Wärme fließt.
-    const rows = [];
-    for (const c of sys.circuits) {
-      const t = this._a(c.ent.target);
-      const mode = this._st(c.ent.mode)?.state;
-      const floor = t.kessel_temperatur !== undefined && t.kessel_temperatur !== null;
-      const flow = floor ? !!t.pumpe_ist : mode !== "circuit_off" && mode !== "summer" && Number(t.ist_temperatur) < Number(this._st(c.ent.target)?.state);
-      rows.push({ c, t, floor, flow, zones: c.rooms });
-    }
-    const kessel = rows.find((r) => r.floor)?.t.kessel_temperatur;
-    const rowH = 70;
-    const H = Math.max(140, rows.reduce((n, r) => n + Math.max(1, r.zones.length) * rowH, 0) + 20);
-    let y = 20;
-    let svg = "";
-    const boilerY = H / 2;
-    for (const r of rows) {
-      const n = Math.max(1, r.zones.length);
-      const cy = y + (n * rowH) / 2 - rowH / 2 + 25;
-      const cls = r.flow ? "pipe flow" : "pipe";
-      svg += `<path class="${cls}" d="M150 ${boilerY} C 200 ${boilerY}, 200 ${cy}, 260 ${cy}"/>`;
-      svg += `<rect class="box ${r.flow ? "hotbox" : ""}" x="260" y="${cy - 22}" width="190" height="44" rx="10"/>
-        <text x="355" y="${cy - 3}" class="t">${esc(r.c.name)}</text>
-        <text x="355" y="${cy + 14}" class="s">${r.floor ? (r.t.pumpe_ist ? "Pumpe läuft" : "Pumpe aus") : `${fmt(r.t.ist_temperatur)} → ${fmt(this._st(r.c.ent.target)?.state)} °C`}</text>`;
-      r.zones.forEach((z, i) => {
-        const zt = this._a(z.ent.target);
-        const zy = y + i * rowH + 25;
-        const zflow = r.floor ? r.t.pumpe_ist && zt.ventile_offen : r.flow;
-        svg += `<path class="${zflow ? "pipe flow" : "pipe"}" d="M450 ${cy} C 500 ${cy}, 500 ${zy}, 550 ${zy}"/>
-          <rect class="box ${zflow ? "hotbox" : ""}" x="550" y="${zy - 22}" width="230" height="44" rx="10"/>
-          <text x="665" y="${zy - 3}" class="t">${esc(z.name)}</text>
-          <text x="665" y="${zy + 14}" class="s">${fmt(zt.ist_temperatur)} → ${fmt(this._st(z.ent.target)?.state)} °C${zt.ventile_offen === undefined || zt.ventile_offen === null ? "" : zt.ventile_offen ? " · offen" : " · zu"}</text>`;
-      });
-      y += n * rowH;
-    }
-    svg = `<rect class="box boiler" x="20" y="${boilerY - 40}" width="130" height="80" rx="14"/>
-      <text x="85" y="${boilerY - 8}" class="t">Wärmeerzeuger</text>
-      <text x="85" y="${boilerY + 14}" class="s">${kessel !== undefined ? `${fmt(kessel)} °C` : ""}</text>` + svg;
-    return `<svg class="schema" viewBox="0 0 800 ${H}" preserveAspectRatio="xMinYMin meet">${svg}</svg>`;
-  }
-
   _system(sys) {
-    const s = sys.ent;
+    const s = sys.ent, writing = this._on(s.write_enabled);
     const problems = this._a(s.problem).probleme || [];
-    const writing = this._on(s.write_enabled);
+    const info = this._info(sys);
     return `<div class="system">
-      <div class="head">
-        <h1>${esc(sys.name)}</h1>
-        <button class="chip ${writing ? "on" : "shadow"}" data-toggle="${s.write_enabled}">${writing ? "Steuert aktiv" : "Schattenbetrieb – schaltet nichts"}</button>
-        ${this._chip(s.away, "Abwesend")} ${this._chip(s.guest, "Gast")}
+      <h1>${esc(sys.name)}</h1>
+      <div class="status ${writing ? "live" : "shadow"}">
+        <div class="stxt"><b>${writing ? "Steuert aktiv" : "Schattenbetrieb"}</b><small>${writing ? "Heating Core schaltet die Anlage." : "Rechnet mit, schaltet aber nichts."}</small></div>
+        <div class="seg">
+          <button class="${writing ? "on" : ""}" data-toggle="${s.write_enabled}" aria-pressed="${writing}">Schreiben</button>
+          <button class="${this._on(s.away) ? "on" : ""}" data-toggle="${s.away}" aria-pressed="${this._on(s.away)}">Abwesend</button>
+          <button class="${this._on(s.guest) ? "on" : ""}" data-toggle="${s.guest}" aria-pressed="${this._on(s.guest)}">Gast</button>
+        </div>
       </div>
-      ${problems.length ? `<div class="warnbox">${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => ": " + (PROBLEMS[k] || k)))).join("<br>")}</div>` : ""}
-      <div class="globals">${this._slider(s.eco, "Eco")}${this._slider(s.away_temp, "Abwesend")}</div>
-      <section class="card schemawrap">${this._schema(sys)}</section>
-      <div class="grid">${sys.circuits.map((c) => this._circuit(c)).join("")}</div>
+      ${problems.length ? `<div class="alert">${icon(I.warn, false, 20, 20)}<span>${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => " – " + (PROBLEMS[k] || k)))).join("<br>")}</span></div>` : ""}
+      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow)}${this._legend()}</section>
+      ${info.map((i) => this._circuitGroup(i)).join("")}
+      <section class="card"><h2>Grundwerte</h2>${this._slider(s.eco, "Eco")}${this._slider(s.away_temp, "Abwesend")}</section>
     </div>`;
   }
 
@@ -202,6 +318,7 @@ class HeatingCorePanel extends HTMLElement {
     const menu = this.shadowRoot.querySelector("ha-menu-button");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => this._toggle(b.dataset.toggle)));
+    this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d))));
     this.shadowRoot.querySelectorAll("[data-number]").forEach((inp) => {
       const out = this.shadowRoot.querySelector(`[data-out="${inp.dataset.number}"]`);
       inp.addEventListener("pointerdown", () => { this._dragging = true; });
@@ -213,46 +330,75 @@ class HeatingCorePanel extends HTMLElement {
 
 const CSS = `
   :host { display:block; background: var(--primary-background-color); color: var(--primary-text-color); min-height:100vh; }
-  .page { max-width: 1200px; margin: 0 auto; padding: 0 16px 32px; font-family: var(--paper-font-body1_-_font-family, system-ui); }
-  .top { display:flex; align-items:center; gap:8px; height:56px; font-size:20px; }
-  h1 { font-size: 22px; margin: 0; } h2 { font-size: 17px; margin: 0; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 0 16px 32px; font-family: var(--paper-font-body1_-_font-family, system-ui); }
+  .top { display:flex; align-items:center; gap:8px; height:56px; font-size:20px; font-weight: 500; }
+  h1 { font-size: 26px; font-weight: 600; margin: 4px 0 12px; } h2 { font-size: 16px; font-weight: 600; margin: 0; }
   .system { margin-bottom: 32px; }
-  .head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin: 8px 0 12px; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
-  .card { background: var(--card-background-color); border-radius: 14px; padding: 14px; box-shadow: var(--ha-card-box-shadow, none); border: 1px solid var(--divider-color); margin-bottom: 12px; }
-  .grid .card { margin: 0; }
-  .row { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin: 4px 0; }
-  .small { font-size: 13px; color: var(--secondary-text-color); } .muted { color: var(--secondary-text-color); }
-  .row.small { justify-content: flex-start; gap: 4px 6px; }
-  .big { display:grid; grid-template-columns: auto auto auto auto auto; align-items:baseline; gap: 4px 8px; margin: 8px 0; font-size: 26px; }
-  .big small { font-size: 12px; color: var(--secondary-text-color); }
-  .mode { font-size: 13px; padding: 2px 10px; border-radius: 999px; background: var(--secondary-background-color); }
-  .mode.hot, .tag.hot { background: #ff7043; color: #fff; }
-  .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--secondary-background-color); margin-left: 4px; }
-  .tag.warn, .warnbox { background: #ffb74d33; color: var(--primary-text-color); }
-  .warnbox { border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: 14px; border: 1px solid #ffb74d; }
-  .chip { border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); border-radius: 999px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
-  .chip.on { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
-  .chip.shadow { background: #90a4ae33; }
-  .slider { display:grid; grid-template-columns: 90px 1fr 70px; align-items:center; gap:8px; font-size: 14px; margin: 6px 0; }
-  .slider input { width: 100%; accent-color: var(--primary-color); cursor: pointer; }
-  .slider b { text-align: right; }
-  .globals { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 16px; }
-  .rooms { margin-top: 10px; display:grid; gap: 8px; }
-  .room { border-top: 1px solid var(--divider-color); padding-top: 8px; }
-  .would { margin: 4px 0 8px; padding-left: 18px; font-size: 13px; }
-  .schemawrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .schema { width: 100%; min-width: 620px; height: auto; display: block; }
-  .schema .box { fill: var(--secondary-background-color); stroke: var(--divider-color); }
-  .schema .hotbox { stroke: #ff7043; stroke-width: 2; }
-  .schema .boiler { fill: #ff704322; stroke: #ff7043; }
-  .schema .t { font-size: 14px; font-weight: 600; text-anchor: middle; fill: var(--primary-text-color); }
-  .schema .s { font-size: 12px; text-anchor: middle; fill: var(--secondary-text-color); }
-  .schema .pipe { fill: none; stroke: #90a4ae; stroke-width: 6; stroke-linecap: round; opacity: .5; }
-  .schema .pipe.flow { stroke: #ff7043; opacity: 1; stroke-dasharray: 14 10; animation: flow 1s linear infinite; }
-  @keyframes flow { to { stroke-dashoffset: -24; } }
+  .muted { color: var(--secondary-text-color); }
+  .card { background: var(--card-background-color); border-radius: 16px; padding: 16px; border: 1px solid var(--divider-color); box-shadow: var(--ha-card-box-shadow, none); margin-bottom: 16px; }
+  .cardhead { display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; }
+  .status { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap: 12px; padding: 12px 16px; border-radius: 16px; margin-bottom: 12px; }
+  .status.shadow { background: repeating-linear-gradient(135deg, #90a4ae1f 0 10px, #90a4ae2e 10px 20px); border: 1px dashed #90a4ae; }
+  .status.live { background: #43a04722; border: 1px solid #43a047; }
+  .stxt { display:flex; flex-direction:column; } .stxt small { color: var(--secondary-text-color); }
+  .seg { display:inline-flex; border: 1px solid var(--divider-color); border-radius: 999px; overflow:hidden; background: var(--card-background-color); }
+  .seg button { border:0; background: transparent; color: var(--primary-text-color); padding: 8px 14px; font: inherit; font-size: 14px; }
+  .seg button + button { border-left: 1px solid var(--divider-color); }
+  .seg button.on { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .alert { display:flex; gap: 10px; align-items:center; padding: 10px 14px; border-radius: 12px; background: ${WARN}22; border: 1px solid ${WARN}; margin-bottom: 12px; font-size: 14px; }
+  .badge { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .badge.hot { background: ${HOT}; color: #fff; } .badge.eco { background: ${COLD}22; color: ${COLD}; }
+  .badge.off { background: var(--secondary-background-color); color: var(--secondary-text-color); } .badge.warn { background: ${WARN}33; color: var(--primary-text-color); }
+
+  .schema { display:block; width: 100%; height: auto; } .schema.wide { max-width: 980px; margin: 0 auto; }
+  .schema .box { fill: var(--card-background-color); stroke: var(--divider-color); stroke-width: 1.5; }
+  .schema .box.hot { stroke: ${HOT}; } .schema .box.warnbox { stroke: ${WARN}; stroke-dasharray: 4 3; }
+  .schema .boiler { fill: ${HOT}14; stroke: ${HOT}88; }
+  .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; }
+  .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
+  .schema .s { font-size: 12px; fill: var(--secondary-text-color); }
+  .schema .big { font-size: 20px; font-weight: 600; fill: var(--primary-text-color); }
+  .schema .pipe { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; } .schema .pipe.thin { stroke-width: 3.5; }
+  .schema .pipe.flow { stroke-dasharray: 10 8; animation: flow 1.2s linear infinite; } .schema .pipe.flow.back { animation-direction: reverse; }
+  .schema .halo { fill: none; stroke: var(--card-background-color); stroke-width: 11; }
+  @keyframes flow { to { stroke-dashoffset: -18; } }
   @media (prefers-reduced-motion: reduce) { .schema .pipe.flow { animation: none; } }
-  button:not(:disabled) { cursor: pointer; }
+  .pump circle { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 2; } .pump path { fill: ${IDLE}; }
+  .pump.on circle { stroke: ${HOT}; } .pump.on path { fill: ${HOT}; }
+  .valve rect { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.5; } .valve.open rect { stroke: ${HOT}; }
+  .valve path { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.8; stroke-linejoin: round; } .valve.open path { fill: ${HOT}; stroke: ${HOT}; }
+  .rad rect { fill: var(--card-background-color); } .rad rect, .rad path { stroke: ${IDLE}; stroke-width: 1.8; } .rad path { fill: none; }
+  .rad.on rect, .rad.on path { stroke: ${HOT}; } .rad.on rect { fill: ${HOT}22; }
+  .legend { display:flex; flex-wrap:wrap; gap: 6px 16px; margin-top: 12px; font-size: 12px; color: var(--secondary-text-color); align-items:center; }
+  .legend span { display:inline-flex; align-items:center; gap: 6px; } .legend .ln { width: 22px; height: 5px; border-radius: 3px; display:inline-block; }
+
+  .group { margin: 20px 0; }
+  .ghead { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; margin: 0 4px 2px; }
+  .gmeta { font-size: 13px; color: var(--secondary-text-color); margin: 0 4px 10px; }
+  .would { font-size: 13px; background: var(--secondary-background-color); border-radius: 10px; padding: 6px 12px; margin-bottom: 10px; }
+  .tiles { display:grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .tile { background: var(--card-background-color); border: 1px solid var(--divider-color); border-radius: 18px; padding: 12px; display:flex; flex-direction:column; align-items:center; gap: 4px; }
+  .tile.hot { border-color: ${HOT}88; } .tile.warn { border-color: ${WARN}; }
+  .tname { display:flex; align-items:center; gap: 6px; font-weight: 600; font-size: 14px; align-self: stretch; }
+  .tname .dot { color: #43a047; font-size: 10px; }
+  .ring { width: 120px; height: 120px; } .ring circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+  .ring .track { stroke: var(--secondary-background-color); } .ring .val { stroke: ${IDLE}; }
+  .ring.hot .val { stroke: ${HOT}; } .ring.eco .val { stroke: ${COLD}; } .ring.warn .val { stroke: ${WARN}; }
+  .ring .mark { fill: var(--card-background-color); stroke: var(--primary-text-color); stroke-width: 2.5; }
+  .ring text { text-anchor: middle; fill: var(--primary-text-color); } .ring .rv { font-size: 22px; font-weight: 600; } .ring .rs { font-size: 10px; fill: var(--secondary-text-color); }
+  .tmode { font-size: 13px; font-weight: 500; text-align: center; } .note { font-size: 12px; color: var(--secondary-text-color); text-align: center; }
+  .bigtemp { font-size: 44px; font-weight: 600; color: ${HOT}; padding: 22px 0 10px; }
+  .stepper { display:flex; align-items:center; gap: 10px; margin-top: 6px; font-size: 12px; color: var(--secondary-text-color); }
+  .stepper span { display:flex; flex-direction:column; align-items:center; min-width: 56px; } .stepper b { font-size: 15px; color: var(--primary-text-color); }
+  .stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); font-size: 18px; line-height: 1; }
+  .chip { border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin-top: 4px; }
+  .chip.on { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+  .slider { display:grid; grid-template-columns: 90px 1fr 70px; align-items:center; gap:8px; font-size: 14px; margin: 8px 0; }
+  .slider input { width: 100%; accent-color: var(--primary-color); }
+  .slider b { text-align: right; }
+  @media (max-width: 600px) { .tiles { grid-template-columns: repeat(2, 1fr); gap: 10px; } .ring { width: 104px; height: 104px; } .seg button { padding: 8px 11px; } }
+  button:not(:disabled), [role="button"], summary, label:has(input:not(:disabled)), input[type="range"]:not(:disabled) { cursor: pointer; }
+  :disabled { cursor: not-allowed; }
 `;
 
 customElements.define("heating-core-panel", HeatingCorePanel);

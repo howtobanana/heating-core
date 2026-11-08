@@ -1,0 +1,37 @@
+{
+  "binary_sensor.perg_problem": {"state": "on", "attributes": {"probleme": ["Bad OG: sensor_missing"]}, "device": "Perg", "key": "problem"},
+  "number.perg_eco": {"state": "19.0", "attributes": {"min": 10, "max": 23, "step": 0.5}, "device": "Perg", "key": "eco"},
+  "number.perg_away_temperature": {"state": "16.0", "attributes": {"min": 10, "max": 23, "step": 0.5}, "device": "Perg", "key": "away_temp"},
+  "switch.perg_away": {"state": "off", "attributes": {}, "device": "Perg", "key": "away"},
+  "switch.perg_guest": {"state": "off", "attributes": {}, "device": "Perg", "key": "guest"},
+  "switch.perg_writing_enabled": {"state": "off", "attributes": {}, "device": "Perg", "key": "write_enabled"},
+
+  "sensor.hk1_heizkorper_og_setpoint": {"state": "25.5", "attributes": {"zustand": "heating", "anlage_sollwert": 23.8, "entscheidung": "startup", "wuerde_schreiben": false, "problem": null, "schreib_budget_rest": 10, "kessel_temperatur": null, "kessel_freigabe": null, "pumpe_soll": null, "pumpe_ist": null, "wuerde_schalten": null, "ist_temperatur": 23.1, "anlage": "Perg"}, "device": "HK1 Heizkörper OG", "key": "target"},
+  "sensor.hk1_heizkorper_og_mode": {"state": "boost", "attributes": {}, "device": "HK1 Heizkörper OG", "key": "mode"},
+  "number.hk1_heizkorper_og_comfort": {"state": "23.5", "attributes": {"min": 16, "max": 26, "step": 0.5}, "device": "HK1 Heizkörper OG", "key": "comfort"},
+  "switch.hk1_heizkorper_og_pre_heat": {"state": "off", "attributes": {}, "device": "HK1 Heizkörper OG", "key": "pre_heat"},
+
+  "sensor.hk2_heizkorper_ug_setpoint": {"state": "19.0", "attributes": {"zustand": "heating", "anlage_sollwert": 8.0, "entscheidung": "circuit_off", "wuerde_schreiben": false, "problem": null, "schreib_budget_rest": 10, "kessel_temperatur": null, "kessel_freigabe": null, "pumpe_soll": null, "pumpe_ist": null, "wuerde_schalten": null, "ist_temperatur": 19.9, "anlage": "Perg"}, "device": "HK2 Heizkörper UG", "key": "target"},
+  "sensor.hk2_heizkorper_ug_mode": {"state": "circuit_off", "attributes": {}, "device": "HK2 Heizkörper UG", "key": "mode"},
+  "number.hk2_heizkorper_ug_comfort": {"state": "20.0", "attributes": {"min": 16, "max": 26, "step": 0.5}, "device": "HK2 Heizkörper UG", "key": "comfort"},
+  "switch.hk2_heizkorper_ug_pre_heat": {"state": "off", "attributes": {}, "device": "HK2 Heizkörper UG", "key": "pre_heat"},
+
+  "sensor.hk3_fussboden_setpoint": {"state": "unknown", "attributes": {"zustand": "shadow", "anlage_sollwert": null, "entscheidung": null, "wuerde_schreiben": true, "problem": null, "schreib_budget_rest": null, "kessel_temperatur": 64.0, "kessel_freigabe": true, "pumpe_soll": false, "pumpe_ist": true, "wuerde_schalten": ["switch.coordinator_fussbodenheizung_l1 → aus"], "ist_temperatur": null, "anlage": "Perg"}, "device": "HK3 Fußboden", "key": "target"},
+  "sensor.hk3_fussboden_mode": {"state": "floor_idle", "attributes": {}, "device": "HK3 Fußboden", "key": "mode"},
+  "switch.hk3_fussboden_pre_heat": {"state": "off", "attributes": {}, "device": "HK3 Fußboden", "key": "pre_heat"},
+
+  "sensor.buro_og_setpoint": {"state": "21.0", "attributes": {"modus": "manual", "trv_sollwert": 20.0, "ist_temperatur": 20.0, "waermebedarf": true, "problem": null, "ventile_offen": null, "ventile_soll": null, "heizkreis": "HK1 Heizkörper OG"}, "device": "Büro OG", "key": "target"},
+  "sensor.buro_og_mode": {"state": "manual", "attributes": {}, "device": "Büro OG", "key": "mode"},
+  "number.buro_og_comfort": {"state": "21.0", "attributes": {"min": 16, "max": 26, "step": 0.5}, "device": "Büro OG", "key": "comfort"},
+  "switch.buro_og_pre_heat": {"state": "off", "attributes": {}, "device": "Büro OG", "key": "pre_heat"},
+
+  "sensor.wohnzimmer_ug_setpoint": {"state": "22.0", "attributes": {"modus": "floor_idle", "trv_sollwert": null, "ist_temperatur": 23.1, "waermebedarf": null, "problem": null, "ventile_offen": false, "ventile_soll": null, "heizkreis": "HK3 Fußboden"}, "device": "Wohnzimmer UG", "key": "target"},
+  "sensor.wohnzimmer_ug_mode": {"state": "floor_idle", "attributes": {}, "device": "Wohnzimmer UG", "key": "mode"},
+  "number.wohnzimmer_ug_comfort": {"state": "22.0", "attributes": {"min": 16, "max": 26, "step": 0.5}, "device": "Wohnzimmer UG", "key": "comfort"},
+  "switch.wohnzimmer_ug_pre_heat": {"state": "off", "attributes": {}, "device": "Wohnzimmer UG", "key": "pre_heat"},
+
+  "sensor.bad_og_setpoint": {"state": "22.0", "attributes": {"modus": "sensor_missing", "trv_sollwert": null, "ist_temperatur": null, "waermebedarf": null, "problem": "sensor_missing", "ventile_offen": true, "ventile_soll": null, "heizkreis": "HK3 Fußboden"}, "device": "Bad OG", "key": "target"},
+  "sensor.bad_og_mode": {"state": "sensor_missing", "attributes": {}, "device": "Bad OG", "key": "mode"},
+  "number.bad_og_comfort": {"state": "22.0", "attributes": {"min": 16, "max": 26, "step": 0.5}, "device": "Bad OG", "key": "comfort"},
+  "switch.bad_og_pre_heat": {"state": "off", "attributes": {}, "device": "Bad OG", "key": "pre_heat"}
+}
