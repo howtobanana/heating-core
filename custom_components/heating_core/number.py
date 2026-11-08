@@ -15,11 +15,14 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     coordinator = entry.runtime_data
     async_add_entities([GlobalTemp(coordinator, "eco"), GlobalTemp(coordinator, "away_temp")])
     for sid, sub in entry.subentries.items():
-        if sub.subentry_type == SUB_CIRCUIT or (sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower"):
-            if sub.data.get("kind") == "floor_external":
-                continue  # externer Fußbodenkreis hat keinen eigenen Sollwert, nur seine Zonen
-            async_add_entities([Comfort(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0))),
-                                Setback(coordinator, sid, sub.title)], config_subentry_id=sid)
+        if sub.subentry_type == SUB_CIRCUIT:
+            # Absenkung gibt es je Heizkreis (Fabian, 08.11.2026), Räume erben sie; Abwesend bleibt global
+            new = [Setback(coordinator, sid, sub.title)]
+            if sub.data.get("kind") != "floor_external":  # externer Fußbodenkreis: Komfort nur in den Zonen
+                new.append(Comfort(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0))))
+            async_add_entities(new, config_subentry_id=sid)
+        elif sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower":
+            async_add_entities([Comfort(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0)))], config_subentry_id=sid)
 
 
 class _Temp(HeatingEntity, RestoreNumber):

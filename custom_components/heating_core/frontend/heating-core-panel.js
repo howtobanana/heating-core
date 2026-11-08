@@ -178,7 +178,7 @@ class HeatingCorePanel extends HTMLElement {
     const tone = this._tone(mode, problem);
     const comfort = this._st(ent.comfort);
     const presence = this._on(ent.presence);
-    const now = has(soll) ? ` · jetzt ${fmt(soll)}°` : "";
+    const now = has(soll) && !OFF_MODES.has(mode) ? ` · jetzt ${fmt(soll)}°` : "";
     return `<div class="tile ${tone}">
       <div class="tname">${iconSvg || ""}<span>${esc(name)}</span>${presence ? '<span class="dot" title="Präsenz">●</span>' : ""}</div>
       ${this._dial(ist, ent.comfort, tone)}
@@ -187,8 +187,7 @@ class HeatingCorePanel extends HTMLElement {
       ${comfort ? `<div class="stepper"><button data-step="${ent.comfort}" data-d="-1" aria-label="Komfort niedriger">−</button>
         <span>Komfort</span>
         <button data-step="${ent.comfort}" data-d="1" aria-label="Komfort höher">+</button></div>` : ""}
-      ${this._setback(ent.setback)}
-      ${this._planLine(plan)}
+      ${plan ? this._planLine(plan) : ""}
       ${ent.pre_heat ? `<button class="chip ${this._on(ent.pre_heat) ? "on" : ""}" data-toggle="${ent.pre_heat}">Vorheizen</button>` : ""}
     </div>`;
   }
@@ -315,14 +314,15 @@ class HeatingCorePanel extends HTMLElement {
         <div class="note">${t.pumpe_soll !== t.pumpe_ist && t.pumpe_soll != null ? `würde ${t.pumpe_soll ? "ein" : "aus"}schalten` : `Freigabe ${t.kessel_freigabe ? "ja" : "nein"}`}</div>
         ${i.ent.pre_heat ? `<button class="chip ${this._on(i.ent.pre_heat) ? "on" : ""}" data-toggle="${i.ent.pre_heat}">Vorheizen</button>` : ""}</div>`);
     } else {
-      tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow), plan: t.zeitplan }));
+      tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow) }));
     }
     for (const z of i.rooms) {
-      tiles.push(this._tile({ ...z, plan: z.t.zeitplan, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) ? `Thermostat ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
+      tiles.push(this._tile({ ...z, plan: z.t.zeitplan !== t.zeitplan ? z.t.zeitplan : null, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) ? `Thermostat ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
     }
     return `<section class="group">
       <div class="ghead"><h2>${esc(i.name)}</h2>${this._badge(i.mode, i.problem)}</div>
       <div class="gmeta">${esc(meta)}</div>
+      <div class="gctl">${this._planLine(t.zeitplan)}${this._setback(i.ent.setback)}</div>
       ${i.problem ? `<div class="alert">${esc(PROBLEMS[i.problem] || i.problem)}</div>` : ""}
       ${would ? `<div class="would">Würde schalten: ${would}</div>` : ""}
       <div class="tiles">${tiles.join("")}</div>
@@ -346,7 +346,7 @@ class HeatingCorePanel extends HTMLElement {
       ${problems.length ? `<div class="alert">${icon(I.warn, false, 20, 20)}<span>${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => " – " + (PROBLEMS[k] || k)))).join("<br>")}</span></div>` : ""}
       <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel))}${this._legend()}</section>
       ${info.map((i) => this._circuitGroup(i)).join("")}
-      <section class="card"><h2>Grundwerte</h2>${this._slider(s.eco, "Eco")}${this._slider(s.away_temp, "Abwesend")}</section>
+      <section class="card"><h2>Grundwerte</h2>${this._slider(s.away_temp, "Abwesend")}</section>
     </div>`;
   }
 
@@ -471,6 +471,8 @@ const CSS = `
   .stepper { display:flex; align-items:center; gap: 10px; margin-top: 6px; font-size: 12px; color: var(--secondary-text-color); }
   .stepper span { display:flex; flex-direction:column; align-items:center; min-width: 56px; } .stepper b { font-size: 15px; color: var(--primary-text-color); }
   .stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); font-size: 18px; line-height: 1; }
+  .gctl { display:flex; flex-wrap:wrap; align-items:center; gap: 8px 16px; margin: 0 4px 12px; }
+  .gctl .plan, .gctl .mini { margin-top: 0; }
   .mini { display:flex; align-items:center; gap: 8px; font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
   .mini button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font-size: 14px; line-height: 1; }
   .mini b { color: var(--primary-text-color); }

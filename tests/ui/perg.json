@@ -308,36 +308,6 @@
   "device": "HK2 Heizkörper UG",
   "key": "setback"
  },
- "number.buro_og_setback": {
-  "state": "20",
-  "attributes": {
-   "min": 10,
-   "max": 23,
-   "step": 0.5
-  },
-  "device": "Büro OG",
-  "key": "setback"
- },
- "number.wohnzimmer_ug_setback": {
-  "state": "19",
-  "attributes": {
-   "min": 10,
-   "max": 23,
-   "step": 0.5
-  },
-  "device": "Wohnzimmer UG",
-  "key": "setback"
- },
- "number.bad_og_setback": {
-  "state": "19",
-  "attributes": {
-   "min": 10,
-   "max": 23,
-   "step": 0.5
-  },
-  "device": "Bad OG",
-  "key": "setback"
- },
  "schedule.heizplan_hk1": {
   "state": "on",
   "attributes": {
@@ -353,5 +323,15 @@
   },
   "device": "x",
   "key": "x"
+ },
+ "number.hk3_fussboden_setback": {
+  "state": "19",
+  "attributes": {
+   "min": 10,
+   "max": 23,
+   "step": 0.5
+  },
+  "device": "HK3 Fußboden",
+  "key": "setback"
  }
 }
