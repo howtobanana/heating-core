@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import UnitOfMass, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -17,9 +17,11 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
         async_add_entities([Fuel(coordinator)])
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT:
-            async_add_entities([CircuitTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, True)], config_subentry_id=sid)
+            async_add_entities([CircuitTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, True),
+                                Deviation(coordinator, sid, sub.title, True)], config_subentry_id=sid)
         elif sub.subentry_type == SUB_ROOM:
-            async_add_entities([RoomTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, False)], config_subentry_id=sid)
+            async_add_entities([RoomTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, False),
+                                Deviation(coordinator, sid, sub.title, False)], config_subentry_id=sid)
 
 
 class _Target(HeatingEntity, SensorEntity):
@@ -134,3 +136,25 @@ class Fuel(HeatingEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         return {"max_kg": (self.coordinator.data or {}).get("fuel_max_kg")}
+
+
+class Deviation(HeatingEntity, SensorEntity):
+    """Heating-Core-Soll minus Wert an der Anlage bzw. am TRV.
+
+    Im Schattenbetrieb neben dem Blueprint ist das die Abweichung zum Blueprint (HEATING-11: 7 Tage Vergleich).
+    """
+
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_translation_key = "deviation"
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator, sid: str, title: str, circuit: bool) -> None:
+        super().__init__(coordinator, f"{sid}_deviation", sid, title)
+        self._sid, self._circuit = sid, circuit
+
+    @property
+    def native_value(self):
+        d = _find(self.coordinator, self._sid, self._circuit)
+        target, actual = d.get("target"), d.get("set_now" if self._circuit else "setpoint")
+        return None if target is None or actual is None else round(target - actual, 1)

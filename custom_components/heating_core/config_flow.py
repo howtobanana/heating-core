@@ -25,6 +25,7 @@ from .const import (
     F_CLIMATE,
     F_COMFORT,
     F_HUMIDITY,
+    F_HVAC_MODE,
     F_PUMP,
     F_SOURCE_OFF,
     F_SOURCE_ON,
@@ -254,11 +255,17 @@ class CircuitFlow(_BaseSubFlow):
                 vol.Required(F_VALVE_DELAY, default=d.get(F_VALVE_DELAY, 180)): _num(0, 900, 10, "s"),
                 **_common(d, window=False, temp=False),  # Zeitplan/Präsenz erben die Zonen
             })
-        return vol.Schema({
+        fields = {
             _req(F_MASTER, d): _entity("climate"),
             **_common(d),
             _opt(F_HUMIDITY, d): _entity("sensor", device_class="humidity"),
-        })
+        }
+        if self._get_entry().data.get(CONF_MANUFACTURER) == "vaillant":
+            # Betriebsart, die nach dem Sommer wieder gesetzt wird (Blueprint: master_hvac_mode)
+            fields[vol.Required(F_HVAC_MODE, default=d.get(F_HVAC_MODE, "heat_cool"))] = sel.SelectSelector(
+                sel.SelectSelectorConfig(options=["heat_cool", "auto"], translation_key=F_HVAC_MODE)
+            )
+        return vol.Schema(fields)
 
     def _errors(self, data: dict) -> dict[str, str]:
         if data.get(F_KIND) == KIND_FLOOR_EXTERNAL and float(data[F_SOURCE_OFF]) >= float(data[F_SOURCE_ON]):

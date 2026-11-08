@@ -83,7 +83,8 @@
             "source_temp_sensor": "Boiler temperature",
             "source_on": "Release above boiler temperature",
             "source_off": "Block below boiler temperature",
-            "valve_delay_s": "Pump only after valves opened (s)"
+            "valve_delay_s": "Pump only after valves opened (s)",
+            "hvac_mode": "Operating mode after summer"
           }
         }
       },
@@ -156,6 +157,12 @@
         "follower": "Follows master",
         "floor_zone": "Floor zone (valves)"
       }
+    },
+    "hvac_mode": {
+      "options": {
+        "heat_cool": "Manual (heat_cool)",
+        "auto": "Time program with quick veto (auto)"
+      }
     }
   },
   "entity": {
@@ -201,6 +208,9 @@
       },
       "fuel": {
         "name": "Pellets"
+      },
+      "deviation": {
+        "name": "Deviation from system"
       }
     },
     "binary_sensor": {

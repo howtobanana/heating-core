@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .adapters import get_adapter
@@ -25,6 +26,7 @@ from .const import (
     F_COMFORT,
     F_COMFORT_ENTITY,
     F_HUMIDITY,
+    F_HVAC_MODE,
     F_KIND,
     F_PUMP,
     F_SOURCE_OFF,
@@ -105,7 +107,8 @@ class ControlState:
     source_ok: dict[str, bool] = field(default_factory=dict)  # Fußbodenkreis -> Kessel freigegeben
     comfort: dict[str, float] = field(default_factory=dict)  # Regler „Komfort“ je Kreis/Raum
     setback: dict[str, float] = field(default_factory=dict)  # Regler „Absenkung“ je Kreis/Raum
-    trv_writes: dict[str, tuple[float, float]] = field(default_factory=dict)  # TRV -> (Zeit, geschriebener Sollwert)
+    trv_writes: dict[str, tuple[float, float]] = field(default_factory=dict)
+    summer_off: set[str] = field(default_factory=set)  # Master, die Heating Core wegen Sommer ausgeschaltet hat  # TRV -> (Zeit, geschriebener Sollwert)
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
 
@@ -126,6 +129,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.adapter = get_adapter(hass, entry.data.get(CONF_MANUFACTURER, ""))
         self._started = time.time()
         self.notifier = Notifier(hass, entry)
+        self._store = Store(hass, 1, f"heating_core.{entry.entry_id}")  # überlebt Neustarts: wer wegen Sommer aus ist
         self._events: list[str] = []
         self._unsub = None
 
@@ -295,6 +299,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if ccfg.get(F_KIND) == KIND_FLOOR_EXTERNAL:
             return await self._floor_circuit(cid, ccfg, g, now)
         master_entity = ccfg.get(F_MASTER)
+        await self._summer(master_entity, ccfg, g, now)
         state = self.adapter.read(master_entity)
         g_all, g = g, replace(g, eco=self.setback(cid, g.eco))
         out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": state.available}
@@ -411,6 +416,27 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         await self._write_rooms(out, g, now)
         return out
+
+    async def async_load(self) -> None:
+        data = await self._store.async_load() or {}
+        self.control.summer_off = set(data.get("summer_off", []))
+
+    async def _summer(self, master_entity: str, ccfg: dict, g: Globals, now: float) -> None:
+        """Vaillant: im Sommer Therme aus, danach Betriebsart zurück – nur, wenn Heating Core sie ausgeschaltet hat."""
+        summer = getattr(self.adapter, "summer", None)
+        if not summer or not self.control.write_enabled or now - self._started < STARTUP_GUARD_S:
+            return
+        if g.summer:
+            if master_entity not in self.control.summer_off:
+                await summer(master_entity, True, None)
+                self.control.summer_off.add(master_entity)
+                await self._store.async_save({"summer_off": sorted(self.control.summer_off)})
+                self._events.append(f"{ccfg[F_NAME]}: Sommer – Heizung aus")
+        elif master_entity in self.control.summer_off:
+            await summer(master_entity, False, ccfg.get(F_HVAC_MODE) or "heat_cool")
+            self.control.summer_off.discard(master_entity)
+            await self._store.async_save({"summer_off": sorted(self.control.summer_off)})
+            self._events.append(f"{ccfg[F_NAME]}: Sommer vorbei – Heizung wieder an")
 
     async def _write_rooms(self, out: dict[str, Any], g: Globals, now: float) -> None:
         """TRV-Sollwerte schreiben; ein Fehler bei einem Raum stoppt die anderen nicht."""

@@ -7,10 +7,13 @@ from homeassistant.core import HomeAssistant
 from .base import HeatingAdapter
 from .climate import ClimateAdapter
 from .oekofen import OekofenAdapter
+from .vaillant import VaillantAdapter
 
 
 def get_adapter(hass: HomeAssistant, manufacturer: str) -> HeatingAdapter:
-    """Adapter zum Hersteller. Vaillant nutzt bis HEATING-11 den allgemeinen Klima-Adapter."""
+    """Adapter zum Hersteller."""
     if manufacturer == "oekofen":
         return OekofenAdapter(hass)
+    if manufacturer == "vaillant":
+        return VaillantAdapter(hass)
     return ClimateAdapter(hass)

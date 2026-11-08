@@ -83,7 +83,8 @@
             "source_temp_sensor": "Kesseltemperatur",
             "source_on": "Freigabe ab Kesseltemperatur",
             "source_off": "Sperre unter Kesseltemperatur",
-            "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)"
+            "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)",
+            "hvac_mode": "Betriebsart nach dem Sommer"
           }
         }
       },
@@ -156,6 +157,12 @@
         "follower": "Folgt dem Master",
         "floor_zone": "Fußboden-Zone (Ventil-Kanäle)"
       }
+    },
+    "hvac_mode": {
+      "options": {
+        "heat_cool": "Handbetrieb (heat_cool)",
+        "auto": "Zeitprogramm mit Quick-Veto (auto)"
+      }
     }
   },
   "entity": {
@@ -201,6 +208,9 @@
       },
       "fuel": {
         "name": "Pellets"
+      },
+      "deviation": {
+        "name": "Abweichung zur Anlage"
       }
     },
     "binary_sensor": {

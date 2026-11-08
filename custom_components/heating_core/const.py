@@ -79,6 +79,7 @@ F_SCHEDULE = "schedule"
 F_WINDOW = "window"
 F_TEMP = "temp_sensor"
 F_HUMIDITY = "humidity_sensor"
+F_HVAC_MODE = "hvac_mode"  # Vaillant: gewünschte Betriebsart der Zone (heat_cool = Handbetrieb, auto = Zeitprogramm)
 # Fußboden extern (Sonderfall Perg)
 KIND_FLOOR_EXTERNAL = "floor_external"
 ROLE_FLOOR_ZONE = "floor_zone"
