@@ -363,3 +363,18 @@ async def test_heizkreis_ausschalten_und_wieder_an(hass: HomeAssistant) -> None:
         await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["mode"] != "disabled"
     assert {c.data["option"] for c in sel} == {"2_heizen"}
+
+
+async def test_raumfuehler_der_pellematic_sperrt_kreis(hass: HomeAssistant) -> None:
+    """HEATING-29: „Raumtemperatur erreicht“, aber ein Raum braucht Wärme -> Hinweis, an der Pellematic umzustellen."""
+    from custom_components.heating_core.notify import collect_problems
+
+    _hk1_states(hass, mode="2_heizen", text="Heizbetrieb aktiv|Raumtemperatur erreicht")
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 15.0})  # Raum kalt
+    coordinator = await _setup(hass, _hk1_entry())
+    await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["problem"] == "room_sensor_blocks"
+    assert any("Raumfühler der Pellematic" in p for p in collect_problems(coordinator.data))
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})  # Raum warm genug
+    await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"].get("problem") is None

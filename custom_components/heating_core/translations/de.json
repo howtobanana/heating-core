@@ -135,7 +135,7 @@
           },
           "description": "Geräte und Bedarfsquellen des Heizkreises. Komfort und Absenkung stellst du danach am Regler ein.",
           "data_description": {
-            "master_climate": "Die Zone bzw. der Heizkreis am Wärmeerzeuger, an die Heating Core den Sollwert schreibt (z. B. Vaillant-Zone, Pellematic-Heizkreis).",
+            "master_climate": "Die Zone bzw. der Heizkreis am Wärmeerzeuger, an die Heating Core den Sollwert schreibt (z. B. Vaillant-Zone, Pellematic-Heizkreis). Ökofen: an der Pellematic für diesen Heizkreis Raumfühler aus bzw. Raumeinfluss 0 und Ökomodus aus – sonst schaltet sie den Kreis selbst ab (Anleitung im README).",
             "presence_sensors": "Präsenzmelder im führenden Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
             "schedule": "Zeitplan-Helfer: an = Komfort, aus = Absenkung. Räume ohne eigenen Plan übernehmen diesen. Ohne Zeitplan und ohne Präsenz heizt der Kreis immer auf Komfort.",
             "window": "Fensterkontakt im führenden Raum. Offen länger als die Fenster-Verzögerung → Minimum.",

@@ -23,6 +23,7 @@ const PROBLEMS = {
   master_unavailable: "Thermostat/Heizkreis nicht erreichbar", room_unavailable: "Thermostat nicht erreichbar",
   source_temperature_unknown: "Kesseltemperatur unbekannt",
   room_write_failed: "Thermostat hat den Sollwert nicht angenommen",
+  room_sensor_blocks: "Raumfühler der Pellematic schaltet den Kreis ab, obwohl Räume Wärme brauchen – an der Pellematic beim Heizkreis Raumfühler aus bzw. Raumeinfluss 0",
 };
 const HEATING = new Set(["presence", "schedule", "pre_heat", "manual", "boost", "floor_heating"]);
 const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable", "disabled"]);

@@ -14,6 +14,7 @@ class CircuitState:
     renew_due: bool = False  # z. B. Vaillant-Quick-Veto läuft bald ab
     heating_off: bool = False  # Anlage hat den Kreis selbst abgeschaltet (z. B. Heizgrenze)
     pump_on: bool | None = None  # Heizkreispumpe läuft (None: Anlage meldet es nicht)
+    room_sensor_off: bool = False  # Anlage schaltet den Kreis wegen ihres eigenen Raumfühlers ab (HEATING-29)
 
 
 @dataclass(frozen=True)

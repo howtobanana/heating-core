@@ -115,7 +115,9 @@ class OekofenAdapter:
         pump = next((self.hass.states.get(e) for e in self.hass.states.async_entity_ids("binary_sensor") if e.endswith(f"{b}_l_pump")), None)
         return CircuitState(setpoint, current, setpoint is not None,
                             heating_off=st.state == "off" and mode not in (MODE_HEAT, MODE_SETBACK),
-                            pump_on=pump.state == "on" if pump and pump.state in ("on", "off") else None)
+                            pump_on=pump.state == "on" if pump and pump.state in ("on", "off") else None,
+                            # „Raumtemperatur erreicht“: der Raumfühler der Pellematic hat den Kreis abgeschaltet (HEATING-29)
+                            room_sensor_off="Raumtemperatur erreicht" in (self.hass.states.get(ids["text"]) or _NONE).state)
 
     def needs_takeover(self, master_entity: str, target: float) -> bool:
         """Eigenes Zeitprogramm (auto) oder falsche Betriebsart für das Ziel – auch innerhalb der Hysterese

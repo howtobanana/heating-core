@@ -28,6 +28,7 @@ PROBLEM_TEXT = {
     "source_temperature_unknown": "🟠 Kesseltemperatur unbekannt",
     "forced_min": "🔴 NOT-AUS aktiv – Heizkreis auf Minimum",
     "budget": "🟡 Schreib-Budget erschöpft",
+    "room_sensor_blocks": "🟠 Raumfühler der Pellematic schaltet den Kreis ab, obwohl Räume Wärme brauchen – an der Pellematic beim Heizkreis Raumfühler aus bzw. Raumeinfluss 0 (Anleitung: Einstellungen an der Pellematic)",
 }
 
 
