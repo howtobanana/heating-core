@@ -61,10 +61,25 @@ class OekofenAdapter:
         base = f"sensor.{prefix}_pellematic_1_l_storage"
         return self._num(f"{base}_fill"), self._num(f"{base}_max")
 
-    def starts(self, master_entity: str) -> float | None:
-        """Brennerstarts gesamt: climate.pellematic_heating_circuit_1_climate -> sensor.pellematic_pellematic_1_l_starts"""
-        prefix = circuit_base(master_entity).split("_heating_circuit")[0]
-        return self._num(f"sensor.{prefix}_pellematic_1_l_starts")
+    def boiler(self, master_entity: str) -> dict:
+        """Was die Ökofen-Integration zum Kessel schon liefert (HEATING-21): Außentemperatur (nur Anzeige,
+        die Heizkurve der Pellematic kompensiert selbst), Starts/Tag, Laufzeit/Start, Diagnose, Meldungen,
+        Warmwasser mit Kesselwärme."""
+        p = circuit_base(master_entity).split("_heating_circuit")[0]
+        diag = self.hass.states.get(f"sensor.{p}_diagnosis")
+        msg = self.hass.states.get(f"sensor.{p}_last_message")
+        dhw = f"select.{p}_hot_water_1_use_boiler_heat"
+        return {
+            "outdoor": self._num(f"sensor.{p}_l_ambient"),
+            "starts_per_day": self._num(f"sensor.{p}_pe1_burner_starts_per_day"),
+            "runtime_per_start": self._num(f"sensor.{p}_pe1_burner_runtime_per_start"),
+            "diagnosis": diag.state if diag else None,
+            "diagnosis_text": diag.attributes.get("summary") if diag else None,
+            "message": msg.state if msg and msg.state not in ("unknown", "unavailable") else None,
+            "message_time": msg.attributes.get("time") if msg else None,
+            "messages_active": [m.get("text", m) if isinstance(m, dict) else m for m in (msg.attributes.get("active") or [])] if msg else [],
+            "dhw_boiler_heat": dhw if self.hass.states.get(dhw) else None,
+        }
 
     def _ids(self, master_entity: str) -> dict[str, str]:
         b = circuit_base(master_entity)

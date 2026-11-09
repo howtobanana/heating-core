@@ -266,14 +266,13 @@ async def test_falsche_betriebsart_auch_in_hysterese(hass: HomeAssistant) -> Non
     assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-3.0]
 
 
-async def test_traeger_kessel_kurze_absenkung_und_starts(hass: HomeAssistant) -> None:
-    """HEATING-19: Absenkphase unter 3 h überspringen, 1 h früher Komfort, Brennerstarts seit Mitternacht."""
+async def test_traeger_kessel_kurze_absenkung(hass: HomeAssistant) -> None:
+    """HEATING-19: Absenkphase unter 3 h überspringen, 1 h früher Komfort."""
     from datetime import timedelta
     from homeassistant.util import dt as dt_util
 
     _hk1_states(hass, mode="2_heizen")
     hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})
-    hass.states.async_set("sensor.pellematic_pellematic_1_l_starts", "5130")
     in_2h = (dt_util.now() + timedelta(hours=2)).isoformat()
     hass.states.async_set("schedule.hk1", "off", {"next_event": in_2h})
     coordinator = await _setup(hass, _hk1_entry(schedule="schedule.hk1"))
@@ -284,10 +283,6 @@ async def test_traeger_kessel_kurze_absenkung_und_starts(hass: HomeAssistant) ->
     hass.states.async_set("schedule.hk1", "off", {"next_event": in_5h})
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["target"] == 18.0  # lange Absenkung bleibt
-    assert coordinator.data["starts_today"] == 0
-    hass.states.async_set("sensor.pellematic_pellematic_1_l_starts", "5132")
-    await coordinator.async_refresh()
-    assert coordinator.data["starts_today"] == 2
 
 
 async def test_zeitplan_zuordnen_per_websocket(hass: HomeAssistant, hass_ws_client) -> None:
@@ -303,3 +298,35 @@ async def test_zeitplan_zuordnen_per_websocket(hass: HomeAssistant, hass_ws_clie
     assert entry.subentries["buero"].data["schedule"] == "schedule.heizplan_buero"
     await client.send_json({"id": 2, "type": "heating_core/assign_schedule", "entity_id": "sensor.buero_setpoint", "schedule": "light.x"})
     assert not (await client.receive_json())["success"]
+
+
+async def test_kesseldaten_und_meldungen(hass: HomeAssistant) -> None:
+    """HEATING-21: Kesseldaten der Ökofen-Integration, Diagnose als Problem, neue Meldung als Ereignis,
+    keine Gebäude-Kompensation obendrauf (die Heizkurve der Pellematic kompensiert selbst)."""
+    from custom_components.heating_core.notify import collect_problems
+
+    _hk1_states(hass, mode="2_heizen")
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})
+    hass.states.async_set("sensor.pellematic_l_ambient", "4.1")
+    hass.states.async_set("sensor.pellematic_pe1_burner_starts_per_day", "5.1")
+    hass.states.async_set("sensor.pellematic_pe1_burner_runtime_per_start", "161")
+    hass.states.async_set("sensor.pellematic_diagnosis", "ok", {"summary": None})
+    hass.states.async_set("sensor.pellematic_last_message", "PE 1 Pellets Warnung", {"time": "2026-11-09T12:57:37", "active": []})
+    hass.states.async_set("select.pellematic_hot_water_1_use_boiler_heat", "0_aus")
+    hass.states.async_set("sensor.aussen", "-12")
+    entry = _hk1_entry()
+    coordinator = await _setup(hass, entry)
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "weather_enabled": True, "outdoor_sensor": "sensor.aussen", "weather_zone1": 3.0})
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data
+    await coordinator.async_refresh()
+    k = coordinator.data["boiler"]
+    assert (k["outdoor"], k["starts_per_day"], k["runtime_per_start"]) == (4.1, 5.1, 161.0)
+    assert k["dhw_boiler_heat"] == "select.pellematic_hot_water_1_use_boiler_heat"
+    assert coordinator.data["circuits"]["hk1"]["target"] == 22.0  # kein +3 °C Wetter-Aufschlag
+    assert collect_problems(coordinator.data) == []
+    hass.states.async_set("sensor.pellematic_diagnosis", "cleaning_due", {"summary": "Brennkammer reinigen"})
+    hass.states.async_set("sensor.pellematic_last_message", "PE 1 Saugturbine", {"time": "2026-11-09T18:00:00", "active": [{"text": "PE 1 Saugturbine"}]})
+    await coordinator.async_refresh()
+    assert collect_problems(coordinator.data) == ["🟡 Kessel: Reinigung fällig: Brennkammer reinigen", "🟠 Kessel meldet: PE 1 Saugturbine"]
+    assert "Kessel meldet: PE 1 Saugturbine" in coordinator._events

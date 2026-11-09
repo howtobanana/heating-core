@@ -73,7 +73,7 @@ async def _register_panel(hass: HomeAssistant) -> None:
         webcomponent_name="heating-core-panel",
         sidebar_title="Heizung",
         sidebar_icon="mdi:radiator",
-        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.13.0",
+        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.14.0",
         require_admin=False,
     )
     hass.data[f"{DOMAIN}_panel"] = True

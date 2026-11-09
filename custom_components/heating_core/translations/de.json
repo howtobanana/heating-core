@@ -295,9 +295,6 @@
       },
       "deviation": {
         "name": "Abweichung zur Anlage"
-      },
-      "starts_today": {
-        "name": "Brennerstarts heute"
       }
     },
     "binary_sensor": {

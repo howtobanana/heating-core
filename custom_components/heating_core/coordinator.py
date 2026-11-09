@@ -118,7 +118,6 @@ class ControlState:
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
     write_events: dict[str, tuple] = field(default_factory=dict)  # Kreis -> Ereignislage beim letzten Write (HEATING-19)
-    starts_base: dict[str, Any] = field(default_factory=dict)  # Brennerstarts zu Tagesbeginn: {"date", "count"}
 
 
 class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -139,6 +138,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.notifier = Notifier(hass, entry)
         self._store = Store(hass, 1, f"heating_core.{entry.entry_id}")  # überlebt Neustarts: wer wegen Sommer aus ist
         self._events: list[str] = []
+        self._last_message: str | None = None  # Zeit der zuletzt gesehenen Kessel-Meldung
         self._unsub = None
 
     # ---- Konfiguration -----------------------------------------------------
@@ -297,7 +297,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fuel = getattr(self.adapter, "fuel", None)
         masters = [c[F_MASTER] for c in self.circuits().values() if c.get(F_MASTER)]
         result["fuel_kg"], result["fuel_max_kg"] = fuel(masters[0]) if fuel and masters else (None, None)
-        result["starts_today"] = await self._starts_today(masters[0] if masters else None)
+        result["boiler"] = self._boiler(masters[0] if masters else None)
         try:
             await self.notifier.update(result, self._events, ready=now - self._started >= STARTUP_GUARD_S)
         except (HomeAssistantError, ValueError) as err:  # Meldungen dürfen die Regelung nie stoppen
@@ -374,7 +374,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             boost_enabled=bool(self.opt(OPT_BOOST_ENABLED)),
             boost_amount=float(self.opt(OPT_BOOST_AMOUNT)),
             boost_threshold=float(self.opt(OPT_BOOST_THRESHOLD)),
-            weather_enabled=bool(self.opt(OPT_WEATHER_ENABLED)),
+            weather_enabled=bool(self.opt(OPT_WEATHER_ENABLED)) and not lim.modulating,  # Heizkurve der Anlage kompensiert selbst (HEATING-21)
             outdoor_temp=self._num(self.opt(OPT_OUTDOOR_SENSOR)),
             weather_zones=(
                 float(self.opt(OPT_WEATHER_ZONE1)),
@@ -440,22 +440,19 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
         self.control.summer_off = set(data.get("summer_off", []))
-        self.control.starts_base = data.get("starts_base", {})
 
     async def _save(self) -> None:
-        await self._store.async_save({"summer_off": sorted(self.control.summer_off), "starts_base": self.control.starts_base})
+        await self._store.async_save({"summer_off": sorted(self.control.summer_off)})
 
-    async def _starts_today(self, master_entity: str | None) -> float | None:
-        """Brennerstarts seit Mitternacht (Ökofen), Tagesanfang überlebt Neustarts (HEATING-19)."""
-        starts = getattr(self.adapter, "starts", None)
-        count = starts(master_entity) if starts and master_entity else None
-        if count is None:
-            return None
-        today = dt_util.now().date().isoformat()
-        if self.control.starts_base.get("date") != today or count < self.control.starts_base.get("count", 0):
-            self.control.starts_base = {"date": today, "count": count}
-            await self._save()
-        return count - self.control.starts_base["count"]
+    def _boiler(self, master_entity: str | None) -> dict | None:
+        """Kesseldaten der Hersteller-Integration; neue Meldung der Anlage -> Push (HEATING-21)."""
+        boiler = getattr(self.adapter, "boiler", None)
+        info = boiler(master_entity) if boiler and master_entity else None
+        if info and info.get("message_time"):
+            if self._last_message is not None and info["message_time"] != self._last_message and info.get("message"):
+                self._events.append(f"Kessel meldet: {info['message']}")
+            self._last_message = info["message_time"]
+        return info
 
     def _gentle_schedule(self, entity_id: str | None, now: float) -> bool:
         """Träger Kessel: Absenkphasen unter 3 h überspringen, Komfort 1 h vor dem Zeitplan (HEATING-19)."""

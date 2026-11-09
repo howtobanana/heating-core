@@ -308,6 +308,21 @@ class HeatingCorePanel extends HTMLElement {
     return `<svg class="schema ${narrow ? "" : "wide"}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Anlagenschema">${s}</svg>`;
   }
 
+  // Kesseldaten der Ökofen-Integration (HEATING-21): Außentemperatur, Starts/Tag, Laufzeit/Start, Warmwasser mit Kesselwärme
+  _kessel(k) {
+    if (!k) return "";
+    const parts = [
+      has(k.outdoor) ? `Außen <b>${fmt(k.outdoor)} °C</b>` : "",
+      has(k.starts_per_day) ? `<b>${fmt(k.starts_per_day)}</b> Brennerstarts/Tag` : "",
+      has(k.runtime_per_start) ? `<b>${fmt(k.runtime_per_start, 0)} min</b> je Start` : "",
+    ].filter(Boolean);
+    const dhw = k.dhw_boiler_heat ? this._st(k.dhw_boiler_heat) : null;
+    const on = dhw?.state === "1_ein";
+    return `<div class="kessel">${parts.map((x) => `<span>${x}</span>`).join("")}
+      ${dhw ? `<button class="chip ${on ? "on" : ""}" data-select="${esc(k.dhw_boiler_heat)}" data-option="${on ? "0_aus" : "1_ein"}" aria-pressed="${on}"
+        title="Warmwasser mit der Restwärme nach einem Heizlauf laden – spart Brennerstarts">Warmwasser mit Kesselwärme</button>` : ""}</div>`;
+  }
+
   _legend() {
     return `<div class="legend">
       <span><i class="ln" style="background:${HOT}"></i>Vorlauf warm</span>
@@ -367,7 +382,7 @@ class HeatingCorePanel extends HTMLElement {
         </div>
       </div>
       ${problems.length ? `<div class="alert">${icon(I.warn, false, 20, 20)}<span>${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => " – " + (PROBLEMS[k] || k)))).join("<br>")}</span></div>` : ""}
-      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel), sys.model)}${this._legend()}</section>
+      <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel), sys.model)}${this._kessel(this._a(s.fuel).kessel)}${this._legend()}</section>
       ${info.map((i) => this._circuitGroup(i)).join("")}
       <section class="card"><h2>Grundwerte</h2>${this._slider(s.away_temp, "Abwesend")}</section>
     </div>`;
@@ -417,6 +432,8 @@ class HeatingCorePanel extends HTMLElement {
       history.pushState(null, "", b.dataset.nav);
       window.dispatchEvent(new CustomEvent("location-changed"));
     }));
+    this.shadowRoot.querySelectorAll("[data-select]").forEach((b) => b.addEventListener("click", () =>
+      this._hass.callService("select", "select_option", { entity_id: b.dataset.select, option: b.dataset.option })));
     this.shadowRoot.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", () => this._openPlan(b)));
     this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d))));
     this.shadowRoot.querySelectorAll("[data-dial]").forEach((svg) => this._wireDial(svg));
@@ -671,6 +688,8 @@ const CSS = `
   .valve path { fill: var(--card-background-color); stroke: ${IDLE}; stroke-width: 1.8; stroke-linejoin: round; } .valve.open path { fill: ${HOT}; stroke: ${HOT}; }
   .rad rect { fill: var(--card-background-color); } .rad rect, .rad path { stroke: ${IDLE}; stroke-width: 1.8; } .rad path { fill: none; }
   .rad.on rect, .rad.on path { stroke: ${HOT}; } .rad.on rect { fill: ${HOT}22; }
+  .kessel { display:flex; flex-wrap:wrap; align-items:center; gap: 6px 18px; margin-top: 10px; font-size: 13px; color: var(--secondary-text-color); }
+  .kessel b { color: var(--primary-text-color); } .kessel .chip { margin-top: 0; }
   .legend { display:flex; flex-wrap:wrap; gap: 6px 16px; margin-top: 12px; font-size: 12px; color: var(--secondary-text-color); align-items:center; }
   .legend span { display:inline-flex; align-items:center; gap: 6px; } .legend .ln { width: 22px; height: 5px; border-radius: 3px; display:inline-block; }
 

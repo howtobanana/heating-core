@@ -295,9 +295,6 @@
       },
       "deviation": {
         "name": "Deviation from system"
-      },
-      "starts_today": {
-        "name": "Burner starts today"
       }
     },
     "binary_sensor": {

@@ -31,6 +31,18 @@ PROBLEM_TEXT = {
 }
 
 
+# Diagnose der Ökofen-Integration (HEATING-21); ok/learning sind keine Probleme
+DIAGNOSIS_TEXT = {
+    "fault": "🔴 Kessel: Störung",
+    "warning": "🟠 Kessel: Warnung",
+    "maintenance_due": "🟡 Kessel: Wartung fällig",
+    "cleaning_due": "🟡 Kessel: Reinigung fällig",
+    "cleaning_soon": "🟡 Kessel: Reinigung bald fällig",
+    "inefficient": "🟡 Kessel: läuft ineffizient",
+    "notice": "🟡 Kessel: Hinweis",
+}
+
+
 def collect_problems(data: dict) -> list[str]:
     """Alle Probleme der Anlage als lesbare Zeilen (gleiche Quelle wie binary_sensor Problem)."""
     out: list[str] = []
@@ -44,6 +56,10 @@ def collect_problems(data: dict) -> list[str]:
         for r in c.get("rooms", {}).values():
             if r.get("problem"):
                 out.append(f"{PROBLEM_TEXT.get(r['problem'], r['problem'])}: {r.get('name')}")
+    boiler = (data or {}).get("boiler") or {}
+    if boiler.get("diagnosis") in DIAGNOSIS_TEXT:
+        out.append(DIAGNOSIS_TEXT[boiler["diagnosis"]] + (f": {boiler['diagnosis_text']}" if boiler.get("diagnosis_text") else ""))
+    out += [f"🟠 Kessel meldet: {m}" for m in boiler.get("messages_active") or []]
     return out
 
 
