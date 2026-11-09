@@ -86,7 +86,9 @@ def _num(lo: float, hi: float, step: float = 1, unit: str | None = None) -> sel.
 
 
 def _entity(domain: str | list[str], multiple: bool = False, device_class: str | None = None) -> sel.EntitySelector:
-    return sel.EntitySelector(sel.EntitySelectorConfig(domain=domain, multiple=multiple, device_class=device_class))
+    # device_class nur mitgeben, wenn gesetzt: None wird sonst zu [] und das Frontend zeigt gar nichts (HEATING-26)
+    extra = {"device_class": device_class} if device_class else {}
+    return sel.EntitySelector(sel.EntitySelectorConfig(domain=domain, multiple=multiple, **extra))
 
 
 def _opt(key: str, data: dict) -> Any:
