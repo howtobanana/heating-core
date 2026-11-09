@@ -6,6 +6,11 @@
         "data": {
           "name": "Name",
           "manufacturer": "Manufacturer"
+        },
+        "description": "One system per Home Assistant: one house with one heat source. Add heating circuits and rooms afterwards as sub-entries.",
+        "data_description": {
+          "name": "Name of the system, e.g. “Vienna”. Shown on the Heating page and in front of the entities.",
+          "manufacturer": "How Heating Core talks to the heat source. Vaillant: setpoint to the zone (cloud, write budget). Ökofen: operating mode heat/setback plus offset, the Pellematic heating curve stays active. Other: any climate thermostat."
         }
       }
     },
@@ -45,6 +50,36 @@
           "notify_devices": "Phones (mobile app)",
           "quiet_schedule": "Quiet time (schedule, no pushes)",
           "leitstand_expert": "Expert log (full details of every run as notification)"
+        },
+        "description": "Applies to the whole system. Set comfort and setback per circuit or room on its slider or on the Heating page.",
+        "data_description": {
+          "eco_temp": "Default setback for new heating circuits. Each circuit then has its own “Setback” slider.",
+          "away_temp": "Used in the whole house while “Away” is active (switch, geofencing). Pre-heat overrides it.",
+          "min_trv_temp": "Lower limit for all thermostats: frost protection, window open, summer.",
+          "hysteresis": "How far the temperature may drift from the target before Heating Core reacts. Prevents constant switching. Typical: 0.5–0.8 °C.",
+          "budget_per_hour": "Vaillant only: how many writes per hour to the boiler (cloud limit). Safety writes (window, emergency) don't count. Ökofen has no budget.",
+          "presence_activation_min": "Presence must last this long before comfort is used. Filters people just passing through.",
+          "presence_deactivation_min": "Comfort is kept for this long after the last presence.",
+          "window_delay_s": "Setback only after the window has been open this long.",
+          "window_settle_s": "Wait this long after closing before heating again – the sensor reads too cold right after.",
+          "pre_heat_timeout_min": "Pre-heat switches itself off after this time at the latest.",
+          "away_entities": "If any of these is on, the house is “Away” (e.g. input_boolean.global_away from geofencing). There is also the system's own Away switch.",
+          "guest_entity": "Guests in the house: “Away” is ignored while this is on.",
+          "summer_entity": "While on, heating rests: thermostats at minimum, Vaillant boiler off (hot water keeps running), switched back on afterwards.",
+          "outdoor_sensor": "Outdoor temperature for building compensation. Leave empty if unused.",
+          "weather_enabled": "Raises the setpoint a little in cold weather, because walls and windows cool down. Not while away.",
+          "weather_zone1": "Extra °C at −10 °C or colder.",
+          "weather_zone2": "Extra °C between −10 and 0 °C.",
+          "weather_zone3": "Extra °C between 0 and +10 °C. No extra above.",
+          "boost_enabled": "Faster heat-up: if a room is well below comfort, request more for a while. Better off with Ökofen (heating curve).",
+          "boost_amount": "Extra °C requested during boost.",
+          "boost_threshold": "Boost starts at this distance below comfort and ends when the room is nearly there.",
+          "humidity_enabled": "Lowers the setpoint slightly at high humidity – humid air feels warmer.",
+          "humidity_drop": "Drop in °C per 10 % humidity above 60 %, at most 2 °C.",
+          "push_enabled": "Sends writes and new problems to phones. The problem notification in HA is always on.",
+          "notify_devices": "Phones with the Home Assistant app that receive pushes.",
+          "quiet_schedule": "While this schedule is on (e.g. at night), no pushes are sent.",
+          "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting."
         }
       }
     }
@@ -61,6 +96,11 @@
           "data": {
             "name": "Name",
             "kind": "Type"
+          },
+          "description": "A heating circuit is a branch with its own pump or setpoint at the heat source (e.g. radiators upstairs, floor heating).",
+          "data_description": {
+            "name": "Name of the circuit, e.g. “HC1 radiators upstairs”.",
+            "kind": "Radiator or floor: circuit with a master thermostat at the heat source. Floor external: own pump and valves outside the heat source, released by boiler temperature."
           }
         },
         "reconfigure": {
@@ -68,6 +108,11 @@
           "data": {
             "name": "Name",
             "kind": "Type"
+          },
+          "description": "A heating circuit is a branch with its own pump or setpoint at the heat source (e.g. radiators upstairs, floor heating).",
+          "data_description": {
+            "name": "Name of the circuit, e.g. “HC1 radiators upstairs”.",
+            "kind": "Radiator or floor: circuit with a master thermostat at the heat source. Floor external: own pump and valves outside the heat source, released by boiler temperature."
           }
         },
         "details": {
@@ -85,6 +130,21 @@
             "source_off": "Block below boiler temperature",
             "valve_delay_s": "Pump only after valves opened (s)",
             "hvac_mode": "Operating mode after summer"
+          },
+          "description": "Devices and demand sources of the circuit. Set comfort and setback on its sliders afterwards.",
+          "data_description": {
+            "master_climate": "The zone or circuit at the heat source that receives the setpoint.",
+            "presence_sensors": "Presence sensors in the leading room. Presence → comfort, even outside the schedule.",
+            "schedule": "Schedule helper: on = comfort, off = setback. Rooms without their own schedule follow it. Without schedule and presence the circuit always uses comfort.",
+            "window": "Window contact in the leading room. Open longer than the window delay → minimum.",
+            "temp_sensor": "Room sensor for the leading room. More accurate than the heat source's own reading.",
+            "humidity_sensor": "Humidity for humidity compensation.",
+            "pump_switch": "Pump of this floor circuit. Runs only once valves are open and the boiler is warm enough.",
+            "source_temp_sensor": "Boiler or buffer temperature that releases the floor circuit.",
+            "source_on": "The floor pump may run above this boiler temperature.",
+            "source_off": "Below this boiler temperature the pump is blocked. Must be below the release.",
+            "valve_delay_s": "Wait this long after opening the valves before starting the pump.",
+            "hvac_mode": "Vaillant only: zone mode set again after summer. Manual: setpoint directly. Time program: Heating Core sets and renews a quick veto."
           }
         }
       },
@@ -107,6 +167,12 @@
             "name": "Name",
             "circuit": "Heating circuit",
             "role": "Role"
+          },
+          "description": "A room belongs to a heating circuit and has either its own thermostat (TRV) or valve channels of a floor heating.",
+          "data_description": {
+            "name": "Name of the room, e.g. “Office upstairs”.",
+            "circuit": "The circuit the radiator or floor zone is connected to.",
+            "role": "Own room: TRV with its own control, raises the circuit if needed. Follows master: TRV takes the circuit's setpoint plus offset. Floor zone: valve channels of a floor circuit."
           }
         },
         "reconfigure": {
@@ -115,6 +181,12 @@
             "name": "Name",
             "circuit": "Heating circuit",
             "role": "Role"
+          },
+          "description": "A room belongs to a heating circuit and has either its own thermostat (TRV) or valve channels of a floor heating.",
+          "data_description": {
+            "name": "Name of the room, e.g. “Office upstairs”.",
+            "circuit": "The circuit the radiator or floor zone is connected to.",
+            "role": "Own room: TRV with its own control, raises the circuit if needed. Follows master: TRV takes the circuit's setpoint plus offset. Floor zone: valve channels of a floor circuit."
           }
         },
         "details": {
@@ -127,6 +199,16 @@
             "schedule": "Own schedule (else the circuit's)",
             "window": "Window contact",
             "temp_sensor": "Temperature sensor"
+          },
+          "description": "Devices of the room. Set comfort on its slider, dashboard or Heating page; setback comes from the circuit.",
+          "data_description": {
+            "climate": "The radiator thermostat (TRV) that receives the setpoint.",
+            "valves": "Valve channels of this zone; they always switch together.",
+            "offset": "Offset to the circuit setpoint, e.g. −2 °C for a cooler bedroom.",
+            "presence_sensors": "Presence sensors in the room. Presence → comfort, even outside the schedule.",
+            "schedule": "Own schedule for this room only. Empty = the circuit's schedule.",
+            "window": "Window contact in the room. Open longer than the window delay → minimum.",
+            "temp_sensor": "Own room sensor. More accurate than the sensor inside the thermostat."
           }
         }
       },

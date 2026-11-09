@@ -6,6 +6,11 @@
         "data": {
           "name": "Name der Anlage",
           "manufacturer": "Hersteller"
+        },
+        "description": "Eine Anlage pro Home Assistant: ein Haus mit einem Wärmeerzeuger. Heizkreise und Räume legst du danach als Unter-Einträge an.",
+        "data_description": {
+          "name": "Wie die Anlage heißt, z. B. „Wien“. Erscheint auf der Seite „Heizung“ und vor den Entitäten.",
+          "manufacturer": "Bestimmt, wie Heating Core mit dem Wärmeerzeuger spricht. Vaillant: Sollwert an die Zone (Cloud, mit Schreib-Budget). Ökofen: Betriebsart heizen/absenken plus Offset, die Heizkurve der Pellematic bleibt aktiv. Andere: beliebiges climate-Thermostat."
         }
       }
     },
@@ -45,6 +50,36 @@
           "notify_devices": "Handys (Mobile App)",
           "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)",
           "leitstand_expert": "Leitstand Expert (alle Details jedes Laufs als HA-Meldung)"
+        },
+        "description": "Gilt für die ganze Anlage. Komfort und Absenkung stellst du je Heizkreis bzw. Raum am Regler oder auf der Seite „Heizung“ ein.",
+        "data_description": {
+          "eco_temp": "Vorgabe für die Absenkung neuer Heizkreise. Jeder Heizkreis hat danach seinen eigenen Regler „Absenkung“.",
+          "away_temp": "Gilt im ganzen Haus, solange „Abwesend“ aktiv ist (Schalter, Geofencing). Vorheizen hebt sie auf.",
+          "min_trv_temp": "Untergrenze für alle Thermostate: Frostschutz, Fenster offen, Sommer. Darunter schreibt Heating Core nie.",
+          "hysteresis": "So viel muss die Ist-Temperatur vom Ziel abweichen, bevor nachgeregelt wird. Verhindert ständiges Hin- und Herschalten. Üblich: 0,5–0,8 °C.",
+          "budget_per_hour": "Nur Vaillant: so oft darf Heating Core pro Stunde an die Therme schreiben (Cloud-Limit). Sicherheits-Schreibvorgänge (Fenster, NOT-AUS) zählen nicht. Ökofen hat kein Budget.",
+          "presence_activation_min": "So lange muss Präsenz ununterbrochen erkannt werden, bevor auf Komfort geheizt wird. Filtert kurzes Durchgehen.",
+          "presence_deactivation_min": "So lange wird nach der letzten Präsenz noch auf Komfort geheizt.",
+          "window_delay_s": "Erst wenn das Fenster so lange offen ist, senkt Heating Core ab. Kurzes Öffnen bleibt ohne Folgen.",
+          "window_settle_s": "Nach dem Schließen so lange warten, bevor wieder geheizt wird – der Fühler misst direkt danach zu kalt.",
+          "pre_heat_timeout_min": "Vorheizen schaltet sich spätestens nach dieser Zeit selbst aus, auch wenn niemand kommt.",
+          "away_entities": "Ist einer dieser Schalter an, gilt „Abwesend“ (z. B. input_boolean.global_away vom Geofencing). Zusätzlich gibt es den Schalter „Abwesend“ der Anlage.",
+          "guest_entity": "Gäste im Haus: „Abwesend“ wird ignoriert, solange dieser Schalter an ist.",
+          "summer_entity": "Ist er an, ruht die Heizung: Thermostate auf Minimum, Vaillant-Therme aus (Warmwasser läuft weiter), danach automatisch wieder an.",
+          "outdoor_sensor": "Außentemperatur für die Gebäude-Kompensation. Leer lassen, wenn du sie nicht nutzt.",
+          "weather_enabled": "Hebt den Sollwert bei Kälte etwas an, weil Wände und Fenster dann auskühlen. Nicht bei Abwesenheit.",
+          "weather_zone1": "Aufschlag in °C, wenn es draußen −10 °C oder kälter hat.",
+          "weather_zone2": "Aufschlag in °C bei −10 bis 0 °C.",
+          "weather_zone3": "Aufschlag in °C bei 0 bis +10 °C. Darüber kein Aufschlag.",
+          "boost_enabled": "Schneller aufheizen: Liegt ein Raum deutlich unter Komfort, wird kurz höher angefordert. Bei Ökofen (Heizkurve) besser aus.",
+          "boost_amount": "So viel °C wird während des Boosts zusätzlich angefordert.",
+          "boost_threshold": "Ab dieser Abweichung unter Komfort startet der Boost. Er endet, sobald der Raum fast Komfort erreicht hat.",
+          "humidity_enabled": "Senkt den Sollwert leicht, wenn die Luftfeuchte hoch ist – feuchte Luft fühlt sich wärmer an.",
+          "humidity_drop": "Absenkung in °C je 10 % Luftfeuchte über 60 %, höchstens 2 °C.",
+          "push_enabled": "Schickt Schreibvorgänge und neue Probleme aufs Handy. Die Problem-Meldung in HA gibt es immer.",
+          "notify_devices": "Handys mit der Home-Assistant-App, die Push-Nachrichten bekommen.",
+          "quiet_schedule": "Solange dieser Zeitplan an ist (z. B. nachts), werden keine Push-Nachrichten verschickt.",
+          "leitstand_expert": "Zeigt nach jedem Lauf alle Details (Soll, Ist, Entscheidung, Budget je Kreis und Raum) als HA-Meldung. Zur Fehlersuche, sonst aus."
         }
       }
     }
@@ -61,6 +96,11 @@
           "data": {
             "name": "Name",
             "kind": "Art"
+          },
+          "description": "Ein Heizkreis ist ein Strang mit eigener Pumpe bzw. eigenem Sollwert am Wärmeerzeuger (z. B. Heizkörper OG, Fußboden).",
+          "data_description": {
+            "name": "Wie der Heizkreis heißt, z. B. „HK1 Heizkörper OG“.",
+            "kind": "Heizkörper oder Fußboden: Heizkreis mit Master-Thermostat am Wärmeerzeuger. Fußboden extern: eigene Pumpe und Ventile außerhalb des Wärmeerzeugers (z. B. Ventil-Koordinator), freigegeben über die Kesseltemperatur."
           }
         },
         "reconfigure": {
@@ -68,6 +108,11 @@
           "data": {
             "name": "Name",
             "kind": "Art"
+          },
+          "description": "Ein Heizkreis ist ein Strang mit eigener Pumpe bzw. eigenem Sollwert am Wärmeerzeuger (z. B. Heizkörper OG, Fußboden).",
+          "data_description": {
+            "name": "Wie der Heizkreis heißt, z. B. „HK1 Heizkörper OG“.",
+            "kind": "Heizkörper oder Fußboden: Heizkreis mit Master-Thermostat am Wärmeerzeuger. Fußboden extern: eigene Pumpe und Ventile außerhalb des Wärmeerzeugers (z. B. Ventil-Koordinator), freigegeben über die Kesseltemperatur."
           }
         },
         "details": {
@@ -85,6 +130,21 @@
             "source_off": "Sperre unter Kesseltemperatur",
             "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)",
             "hvac_mode": "Betriebsart nach dem Sommer"
+          },
+          "description": "Geräte und Bedarfsquellen des Heizkreises. Komfort und Absenkung stellst du danach am Regler ein.",
+          "data_description": {
+            "master_climate": "Die Zone bzw. der Heizkreis am Wärmeerzeuger, an die Heating Core den Sollwert schreibt (z. B. Vaillant-Zone, Pellematic-Heizkreis).",
+            "presence_sensors": "Präsenzmelder im führenden Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
+            "schedule": "Zeitplan-Helfer: an = Komfort, aus = Absenkung. Räume ohne eigenen Plan übernehmen diesen. Ohne Zeitplan und ohne Präsenz heizt der Kreis immer auf Komfort.",
+            "window": "Fensterkontakt im führenden Raum. Offen länger als die Fenster-Verzögerung → Minimum.",
+            "temp_sensor": "Raumfühler für den führenden Raum. Genauer als der Fühler am Wärmeerzeuger; ohne ihn wird dessen Ist-Wert genommen.",
+            "humidity_sensor": "Luftfeuchte für die Feuchte-Kompensation.",
+            "pump_switch": "Schalter der Pumpe dieses Fußbodenkreises. Läuft erst, wenn die Ventile offen sind und der Kessel warm genug ist.",
+            "source_temp_sensor": "Kessel- bzw. Puffertemperatur, die den Fußbodenkreis freigibt.",
+            "source_on": "Ab dieser Kesseltemperatur darf die Fußbodenpumpe laufen.",
+            "source_off": "Unter dieser Kesseltemperatur wird die Pumpe gesperrt. Muss unter der Freigabe liegen.",
+            "valve_delay_s": "So lange nach dem Öffnen der Ventile warten, bevor die Pumpe startet (Stellantriebe brauchen Zeit).",
+            "hvac_mode": "Nur Vaillant: Betriebsart der Zone, die nach dem Sommer wieder gesetzt wird. Handbetrieb: Sollwert direkt. Zeitprogramm: Heating Core setzt ein Quick-Veto und erneuert es."
           }
         }
       },
@@ -107,6 +167,12 @@
             "name": "Name",
             "circuit": "Heizkreis",
             "role": "Rolle"
+          },
+          "description": "Ein Raum hängt an einem Heizkreis und hat entweder einen eigenen Thermostat (TRV) oder Ventil-Kanäle einer Fußbodenheizung.",
+          "data_description": {
+            "name": "Wie der Raum heißt, z. B. „Büro OG“.",
+            "circuit": "Der Heizkreis, an dem der Heizkörper bzw. die Fußbodenzone hängt.",
+            "role": "Eigener Raum: TRV mit eigener Regelung, hebt bei Bedarf den Heizkreis an. Folgt dem Master: TRV übernimmt den Sollwert des Heizkreises plus Abstand. Fußboden-Zone: Ventil-Kanäle eines Fußbodenkreises."
           }
         },
         "reconfigure": {
@@ -115,6 +181,12 @@
             "name": "Name",
             "circuit": "Heizkreis",
             "role": "Rolle"
+          },
+          "description": "Ein Raum hängt an einem Heizkreis und hat entweder einen eigenen Thermostat (TRV) oder Ventil-Kanäle einer Fußbodenheizung.",
+          "data_description": {
+            "name": "Wie der Raum heißt, z. B. „Büro OG“.",
+            "circuit": "Der Heizkreis, an dem der Heizkörper bzw. die Fußbodenzone hängt.",
+            "role": "Eigener Raum: TRV mit eigener Regelung, hebt bei Bedarf den Heizkreis an. Folgt dem Master: TRV übernimmt den Sollwert des Heizkreises plus Abstand. Fußboden-Zone: Ventil-Kanäle eines Fußbodenkreises."
           }
         },
         "details": {
@@ -127,6 +199,16 @@
             "schedule": "Eigener Zeitplan (sonst der des Heizkreises)",
             "window": "Fensterkontakt",
             "temp_sensor": "Temperatursensor"
+          },
+          "description": "Geräte des Raums. Komfort stellst du danach am Regler, im Dashboard oder auf der Seite „Heizung“ ein; die Absenkung kommt vom Heizkreis.",
+          "data_description": {
+            "climate": "Das Heizkörper-Thermostat (TRV), an das Heating Core den Sollwert schreibt.",
+            "valves": "Ventil-Kanäle dieser Zone; sie schalten immer gemeinsam.",
+            "offset": "Abstand zum Sollwert des Heizkreises, z. B. −2 °C für ein kühleres Schlafzimmer.",
+            "presence_sensors": "Präsenzmelder im Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
+            "schedule": "Eigener Zeitplan nur für diesen Raum. Leer lassen = Zeitplan des Heizkreises.",
+            "window": "Fensterkontakt im Raum. Offen länger als die Fenster-Verzögerung → Minimum.",
+            "temp_sensor": "Eigener Raumfühler. Genauer als der Fühler im Thermostat am Heizkörper."
           }
         }
       },
