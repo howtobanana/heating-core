@@ -31,7 +31,7 @@ def circuit_base(master_entity: str) -> str:
     return name[: -len("_climate")] if name.endswith("_climate") else name
 
 
-MODE_AUTO, MODE_HEAT, MODE_SETBACK = "1_auto", "2_heizen", "3_absenken"
+MODE_OFF, MODE_AUTO, MODE_HEAT, MODE_SETBACK = "0_aus", "1_auto", "2_heizen", "3_absenken"
 
 
 def offset_for(target: float, base: float) -> float:
@@ -130,10 +130,16 @@ class OekofenAdapter:
     async def release(self, master_entity: str) -> None:
         """Schreiben aus: Kreis zurück ans eigene Zeitprogramm (auto, Offset 0)."""
         ids = self._ids(master_entity)
-        if (self.hass.states.get(ids["mode"]) or _NONE).state in (MODE_HEAT, MODE_SETBACK):
+        if (self.hass.states.get(ids["mode"]) or _NONE).state in (MODE_HEAT, MODE_SETBACK, MODE_OFF):
             await self.hass.services.async_call("select", "select_option", {"entity_id": ids["mode"], "option": MODE_AUTO}, blocking=True)
         if self._num(ids["offset"]) not in (None, 0.0):
             await self.hass.services.async_call("number", "set_value", {"entity_id": ids["offset"], "value": 0}, blocking=True)
+
+    async def turn_off(self, master_entity: str) -> None:
+        """Heizkreis ganz aus (HEATING-27): Betriebsart „aus“, der Frostschutz der Pellematic bleibt aktiv."""
+        ids = self._ids(master_entity)
+        if (self.hass.states.get(ids["mode"]) or _NONE).state != MODE_OFF:
+            await self.hass.services.async_call("select", "select_option", {"entity_id": ids["mode"], "option": MODE_OFF}, blocking=True)
 
     def limits(self, master_entity: str) -> AdapterLimits:
         st = self.hass.states.get(master_entity)

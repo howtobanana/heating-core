@@ -88,7 +88,7 @@ _LOGGER = logging.getLogger(__name__)
 TRV_READBACK_S = 5 * 60
 MODE_TEXT = {"eco": "Absenkung", "presence": "Präsenz", "schedule": "Zeitplan", "pre_heat": "Vorheizen", "manual": "Komfort",
              "boost": "Boost", "away": "Abwesend", "window": "Fenster offen", "temperature_drop": "Temperatursturz",
-             "summer": "Sommer", "circuit_off": "Kreis aus"}
+             "summer": "Sommer", "circuit_off": "Kreis aus", "disabled": "Ausgeschaltet"}
 
 
 def _de(v) -> str:
@@ -117,6 +117,7 @@ class ControlState:
     setback: dict[str, float] = field(default_factory=dict)  # Regler „Absenkung“ je Kreis/Raum
     trv_writes: dict[str, tuple[float, float]] = field(default_factory=dict)
     trv_tuned: dict[str, float] = field(default_factory=dict)  # TRV -> Zeit des letzten Abgleichs (HEATING-16)
+    disabled: set[str] = field(default_factory=set)  # Heizkreise, die Fabian ganz ausgeschaltet hat (HEATING-27)
     summer_off: set[str] = field(default_factory=set)  # Master, die Heating Core wegen Sommer ausgeschaltet hat  # TRV -> (Zeit, geschriebener Sollwert)
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
@@ -347,6 +348,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return out
 
         lim = self.adapter.limits(master_entity)
+        if cid in self.control.disabled:
+            return await self._disabled(master_entity, state, lim, out, g, now)
         win = self._window(ccfg.get(F_WINDOW), now)
         any_window = any(
             self._on(w) for w in [ccfg.get(F_WINDOW), *(r.get(F_WINDOW) for r in self.rooms(cid).values())] if w
@@ -443,9 +446,10 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
         self.control.summer_off = set(data.get("summer_off", []))
+        self.control.disabled = set(data.get("disabled", []))
 
     async def _save(self) -> None:
-        await self._store.async_save({"summer_off": sorted(self.control.summer_off)})
+        await self._store.async_save({"summer_off": sorted(self.control.summer_off), "disabled": sorted(self.control.disabled)})
 
     def _boiler(self, master_entity: str | None) -> dict | None:
         """Kesseldaten der Hersteller-Integration; neue Meldung der Anlage -> Push (HEATING-21)."""
@@ -507,6 +511,32 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except (HomeAssistantError, ValueError) as err:
                 _LOGGER.warning("Thermostat %s: Sollwert %s nicht geschrieben: %s", room["entity"], tgt, err)
                 room["problem"] = "room_write_failed"
+
+    async def set_disabled(self, cid: str, off: bool) -> None:
+        """Heizkreis ganz aus/an (HEATING-27); Zustand übersteht Neustarts."""
+        (self.control.disabled.add if off else self.control.disabled.discard)(cid)
+        self.control.writes[cid] = []  # keine Haltezeit nach dem Wiedereinschalten
+        await self._save()
+        await self.async_request_refresh()
+
+    async def _disabled(self, master_entity: str, state, lim, out: dict[str, Any], g: Globals, now: float) -> dict[str, Any]:
+        """Kreis ausgeschaltet: Anlage aus (Ökofen „aus“, Frostschutz der Anlage bleibt), Räume auf das TRV-Minimum."""
+        out.update(mode="disabled", state="disabled", target=None, set_now=state.setpoint, current=state.current,
+                   decision="disabled", pump_on=state.pump_on)
+        for room in out["rooms"].values():
+            if room.get("entity"):
+                room.update(target=g.min_trv, mode="disabled")
+        if self.control.write_enabled and now - self._started >= STARTUP_GUARD_S:
+            try:
+                off = getattr(self.adapter, "turn_off", None)
+                if off:
+                    await off(master_entity)
+                elif state.setpoint is None or abs(state.setpoint - lim.min_temp) > 0.1:
+                    await self.adapter.write_setpoint(master_entity, lim.min_temp)
+            except (HomeAssistantError, ValueError) as err:
+                _LOGGER.warning("%s: Ausschalten fehlgeschlagen: %s", out.get("name"), err)
+        await self._write_rooms(out, g, now)
+        return out
 
     def _companions(self, climate: str) -> list[str]:
         """Alle Entitäten am selben Gerät wie der TRV (Kalibrierung, externer Fühler, Eco-Schalter)."""
@@ -577,6 +607,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
                 window_open_too_long=win.open_too_long,
             ))
+            if cid in self.control.disabled:
+                target = g.min_trv  # Kreis ausgeschaltet: nur noch Frostschutz (HEATING-27)
             zones.append(Zone(rid, temp, target, open_now, open_since, any(r.state == "on" for r in readings)))
             out["rooms"][rid] = {"name": rcfg[F_NAME], "target": target, "current": temp, "valves_open": open_now,
                                  "presence": presence_on}

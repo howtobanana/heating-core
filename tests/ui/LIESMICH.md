@@ -14,3 +14,5 @@ Zeitplan-Editor (HEATING-20) geöffnet zeigen:
 ```bash
 node tests/ui/build.mjs tests/ui/perg.json tests/ui/zeitplan.js > /tmp/zeitplan.mjs && ~/Developer/_werkzeuge/ui-test-unraid.sh /tmp/zeitplan.mjs tests/ui/out
 ```
+
+Heizkreis ausgeschaltet (HEATING-27): `node tests/ui/build.mjs tests/ui/perg.json tests/ui/aus.js`

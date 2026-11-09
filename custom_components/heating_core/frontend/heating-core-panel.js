@@ -8,6 +8,7 @@ const MODES = {
   temperature_drop: "Temperatursturz", summer: "Sommer – Heizung aus", follower: "Folgt dem Kreis",
   unavailable: "Nicht erreichbar", floor_heating: "Fußboden heizt", floor_idle: "Fußboden in Ruhe",
   source_cold: "Kessel zu kalt", sensor_missing: "Sensor fehlt", circuit_off: "Von der Anlage abgeschaltet",
+  disabled: "Ausgeschaltet",
 };
 const DECISIONS = {
   startup: "Startschutz nach Neustart", no_setpoint: "Anlage meldet keinen Sollwert",
@@ -15,7 +16,7 @@ const DECISIONS = {
   within_hysteresis: "Abweichung zu klein", budget: "Schreib-Budget erschöpft",
   hold_drop: "Sperrzeit nach Erhöhen", hold_raise: "Sperrzeit nach Absenken", hold_min: "Kessel schonen: Haltezeit 2 h",
   raise: "Würde erhöhen", drop: "Würde absenken", significant_drop: "Würde deutlich absenken",
-  forced_min: "Sicherheit: Minimum", renew: "Würde erneuern", circuit_off: "Kreis aus – nicht übersteuert",
+  forced_min: "Sicherheit: Minimum", renew: "Würde erneuern", circuit_off: "Kreis aus – nicht übersteuert", disabled: "Kreis ausgeschaltet – nur Frostschutz",
 };
 const PROBLEMS = {
   sensor_missing: "Sensor fehlt", temperature_unknown: "Ist-Temperatur unbekannt",
@@ -24,7 +25,7 @@ const PROBLEMS = {
   room_write_failed: "Thermostat hat den Sollwert nicht angenommen",
 };
 const HEATING = new Set(["presence", "schedule", "pre_heat", "manual", "boost", "floor_heating"]);
-const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable"]);
+const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable", "disabled"]);
 const HOT = "#f4511e", COLD = "#1e88e5", IDLE = "#9aa5b1", WARN = "#f5a623";
 
 const has = (v) => v !== null && v !== undefined && v !== "" && !isNaN(Number(v));
@@ -365,7 +366,9 @@ class HeatingCorePanel extends HTMLElement {
     return `<section class="group">
       <div class="ghead"><h2>${esc(i.name)}</h2>${this._badge(i.mode, i.problem)}</div>
       <div class="gmeta">${esc(meta)}</div>
-      <div class="gctl">${this._planLine(t.zeitplan, i.ent.target, i.name)}${this._setback(i.ent.setback)}</div>
+      <div class="gctl">${this._planLine(t.zeitplan, i.ent.target, i.name)}${this._setback(i.ent.setback)}
+        ${i.ent.enabled ? `<button class="chip ${this._on(i.ent.enabled) ? "" : "offchip"}" data-toggle="${i.ent.enabled}" aria-pressed="${!this._on(i.ent.enabled)}"
+          title="Ganz aus, z. B. unbewohnt oder Sommer – Frostschutz bleibt">${this._on(i.ent.enabled) ? "Kreis ausschalten" : "Kreis ist aus · einschalten"}</button>` : ""}</div>
       ${i.problem ? `<div class="alert">${esc(PROBLEMS[i.problem] || i.problem)}</div>` : ""}
       ${would ? `<div class="would">Würde schalten: ${would}</div>` : ""}
       <div class="tiles">${tiles.join("")}</div>
@@ -730,6 +733,7 @@ const CSS = `
   .plan { border: 0; background: var(--secondary-background-color); color: var(--secondary-text-color); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; margin-top: 4px; }
   .plan.on { background: ${HOT}22; color: var(--primary-text-color); } .plan.add { border: 1px dashed var(--divider-color); background: transparent; }
   .chip { border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin-top: 4px; }
+  .chip.offchip { background: ${COLD}22; border-color: ${COLD}; color: var(--primary-text-color); }
   .chip.on { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
   .slider { display:grid; grid-template-columns: 90px 1fr 70px; align-items:center; gap:8px; font-size: 14px; margin: 8px 0; }
   .slider input { width: 100%; accent-color: var(--primary-color); }

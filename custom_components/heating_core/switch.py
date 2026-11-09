@@ -21,6 +21,8 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT or (sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower"):
             async_add_entities([PreHeatSwitch(coordinator, sid, sub.title)], config_subentry_id=sid)
+        if sub.subentry_type == SUB_CIRCUIT:
+            async_add_entities([CircuitEnabledSwitch(coordinator, sid, sub.title)], config_subentry_id=sid)
 
 
 class ControlSwitch(HeatingEntity, SwitchEntity, RestoreEntity):
@@ -73,3 +75,23 @@ class PreHeatSwitch(HeatingEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs) -> None:
         self.coordinator.control.pre_heat.pop(self._sid, None)
         await self.coordinator.async_request_refresh()
+
+
+class CircuitEnabledSwitch(HeatingEntity, SwitchEntity):
+    """Heizkreis an/aus (HEATING-27): aus = unbewohnt, Sommer; Frostschutz bleibt."""
+
+    _attr_translation_key = "enabled"
+
+    def __init__(self, coordinator, sid: str, title: str) -> None:
+        super().__init__(coordinator, f"{sid}_enabled", sid, title)
+        self._sid = sid
+
+    @property
+    def is_on(self) -> bool:
+        return self._sid not in self.coordinator.control.disabled
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self.coordinator.set_disabled(self._sid, False)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.coordinator.set_disabled(self._sid, True)

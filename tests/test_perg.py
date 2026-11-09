@@ -237,7 +237,7 @@ async def test_eigene_absenkung_sperrt_rueckweg_nicht(hass: HomeAssistant) -> No
         coordinator._started = 0
         await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["decision"] != "circuit_off"
-    assert [c.data["option"] for c in sel] == ["2_heizen"]
+    assert {c.data["option"] for c in sel} == {"2_heizen"}
     assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-1.0]  # 22,0 − 22,8, auf ganze Kelvin
 
 
@@ -262,7 +262,7 @@ async def test_falsche_betriebsart_auch_in_hysterese(hass: HomeAssistant) -> Non
         coordinator._started = 0
         await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["would_write"] is False  # ohne Betriebsart-Prüfung bliebe es so
-    assert [c.data["option"] for c in sel] == ["2_heizen"]
+    assert {c.data["option"] for c in sel} == {"2_heizen"}
     assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-3.0]
 
 
@@ -335,3 +335,29 @@ async def test_kesseldaten_und_meldungen(hass: HomeAssistant) -> None:
     await coordinator.async_refresh()
     assert collect_problems(coordinator.data) == ["🟡 Kessel: Reinigung fällig: Brennkammer reinigen", "🟠 Kessel meldet: PE 1 Saugturbine"]
     assert "Kessel meldet: PE 1 Saugturbine" in coordinator._events
+
+
+async def test_heizkreis_ausschalten_und_wieder_an(hass: HomeAssistant) -> None:
+    """HEATING-27: Kreis aus -> Pellematic „aus“, TRV auf Minimum; wieder an -> normale Regelung ohne Haltezeit."""
+    _hk1_states(hass, mode="2_heizen")
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 20.0})
+    coordinator = await _setup(hass, _hk1_entry())
+    sel = async_mock_service(hass, "select", "select_option")
+    async_mock_service(hass, "number", "set_value")
+    temp = async_mock_service(hass, "climate", "set_temperature")
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
+        coordinator._started = 0
+        await coordinator.set_disabled("hk1", True)
+        await coordinator.async_refresh()
+        hk1 = coordinator.data["circuits"]["hk1"]
+        assert hk1["mode"] == "disabled"
+        assert {c.data["option"] for c in sel} == {"0_aus"}  # Mock ändert den Zustand nicht, daher evtl. zweimal
+        assert {c.data["temperature"] for c in temp} == {12.0}  # TRV-Minimum (Frostschutz)
+        assert "hk1" in (await coordinator._store.async_load())["disabled"]  # übersteht Neustarts
+        hass.states.async_set(f"select.{HK1_B}_mode_auto", "0_aus")
+        sel.clear()
+        await coordinator.set_disabled("hk1", False)
+        await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["mode"] != "disabled"
+    assert {c.data["option"] for c in sel} == {"2_heizen"}

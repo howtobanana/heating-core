@@ -95,7 +95,7 @@ F_VALVES = "valves"
 STARTUP_GUARD_S = 120
 UPDATE_INTERVAL_S = 180
 
-MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing", "circuit_off"]
+MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing", "circuit_off", "disabled"]
 
 # Träger Kessel (Ökofen, HEATING-19, Fabian 09.11.2026): möglichst wenige Brennerstarts
 GENTLE_HOLD_S = 2 * 3600  # Mindesthaltezeit je Kreis nach einem Schreibvorgang (außer Ereignis)

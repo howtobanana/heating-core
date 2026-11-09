@@ -262,6 +262,9 @@
       },
       "pre_heat": {
         "name": "Vorheizen"
+      },
+      "enabled": {
+        "name": "Heizkreis an"
       }
     },
     "sensor": {
@@ -287,7 +290,8 @@
           "floor_idle": "Fußboden in Ruhe",
           "source_cold": "Kessel zu kalt",
           "sensor_missing": "Sensor fehlt",
-          "circuit_off": "Kreis von der Anlage abgeschaltet"
+          "circuit_off": "Kreis von der Anlage abgeschaltet",
+          "disabled": "Ausgeschaltet"
         }
       },
       "fuel": {
