@@ -314,6 +314,9 @@ async def test_kesseldaten_und_meldungen(hass: HomeAssistant) -> None:
     hass.states.async_set("sensor.pellematic_last_message", "PE 1 Pellets Warnung", {"time": "2026-11-09T12:57:37", "active": []})
     hass.states.async_set("select.pellematic_hot_water_1_use_boiler_heat", "0_aus")
     hass.states.async_set("sensor.aussen", "-12")
+    hass.states.async_set("sensor.pellematic_pellematic_1_l_statetext", "Leistungsbrand")
+    hass.states.async_set("sensor.pellematic_pellematic_1_l_modulation", "94")
+    hass.states.async_set("binary_sensor.heizraum_pellematic_heating_circuit_1_l_pump", "off")
     entry = _hk1_entry()
     coordinator = await _setup(hass, entry)
     hass.config_entries.async_update_entry(entry, options={**entry.options, "weather_enabled": True, "outdoor_sensor": "sensor.aussen", "weather_zone1": 3.0})
@@ -322,6 +325,8 @@ async def test_kesseldaten_und_meldungen(hass: HomeAssistant) -> None:
     await coordinator.async_refresh()
     k = coordinator.data["boiler"]
     assert (k["outdoor"], k["starts_per_day"], k["runtime_per_start"]) == (4.1, 5.1, 161.0)
+    assert (k["burner_text"], k["modulation"]) == ("Leistungsbrand", 94.0)  # HEATING-24
+    assert coordinator.data["circuits"]["hk1"]["pump_on"] is False  # Pumpe aus -> Seite zeigt keinen Fluss
     assert k["dhw_boiler_heat"] == "select.pellematic_hot_water_1_use_boiler_heat"
     assert coordinator.data["circuits"]["hk1"]["target"] == 22.0  # kein +3 °C Wetter-Aufschlag
     assert collect_problems(coordinator.data) == []

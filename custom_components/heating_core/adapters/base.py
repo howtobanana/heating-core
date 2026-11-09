@@ -13,6 +13,7 @@ class CircuitState:
     available: bool
     renew_due: bool = False  # z. B. Vaillant-Quick-Veto läuft bald ab
     heating_off: bool = False  # Anlage hat den Kreis selbst abgeschaltet (z. B. Heizgrenze)
+    pump_on: bool | None = None  # Heizkreispumpe läuft (None: Anlage meldet es nicht)
 
 
 @dataclass(frozen=True)

@@ -79,6 +79,9 @@ class OekofenAdapter:
             "message_time": msg.attributes.get("time") if msg else None,
             "messages_active": [m.get("text", m) if isinstance(m, dict) else m for m in (msg.attributes.get("active") or [])] if msg else [],
             "dhw_boiler_heat": dhw if self.hass.states.get(dhw) else None,
+            # Brenner (HEATING-24): Zustand im Klartext und Leistung; brennt, solange er moduliert
+            "burner_text": (self.hass.states.get(f"sensor.{p}_pellematic_1_l_statetext") or _NONE).state or None,
+            "modulation": self._num(f"sensor.{p}_pellematic_1_l_modulation"),
         }
 
     def _ids(self, master_entity: str) -> dict[str, str]:
@@ -107,8 +110,12 @@ class OekofenAdapter:
         # Steuert Heating Core (heizen/absenken), kann das „aus“ von der eigenen Absenkung kommen
         # (Heizgrenze der Absenkphase) – dann darf es das Zurückschreiben nicht sperren.
         mode = (self.hass.states.get(ids["mode"]) or _NONE).state
+        # Pumpe des Heizkreises (Name je nach Gerätename, z. B. binary_sensor.heizraum_pellematic_heating_circuit_1_l_pump)
+        b = circuit_base(master_entity)
+        pump = next((self.hass.states.get(e) for e in self.hass.states.async_entity_ids("binary_sensor") if e.endswith(f"{b}_l_pump")), None)
         return CircuitState(setpoint, current, setpoint is not None,
-                            heating_off=st.state == "off" and mode not in (MODE_HEAT, MODE_SETBACK))
+                            heating_off=st.state == "off" and mode not in (MODE_HEAT, MODE_SETBACK),
+                            pump_on=pump.state == "on" if pump and pump.state in ("on", "off") else None)
 
     def needs_takeover(self, master_entity: str, target: float) -> bool:
         """Eigenes Zeitprogramm (auto) oder falsche Betriebsart für das Ziel – auch innerhalb der Hysterese

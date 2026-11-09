@@ -107,7 +107,8 @@ class HeatingCorePanel extends HTMLElement {
       const mode = this._st(c.ent.mode)?.state;
       const soll = this._st(c.ent.target)?.state;
       const floor = has(t.kessel_temperatur);
-      const flow = floor ? !!t.pumpe_ist : !OFF_MODES.has(mode) && Number(t.ist_temperatur) < Number(soll);
+      // Meldet die Anlage ihre Kreispumpe (Ökofen), zählt nur die: sonst sähe es nach Heizen aus, obwohl nichts fließt (HEATING-24)
+      const flow = floor || typeof t.pumpe_ist === "boolean" ? !!t.pumpe_ist : !OFF_MODES.has(mode) && Number(t.ist_temperatur) < Number(soll);
       const rooms = c.rooms.map((r) => {
         const rt = this._a(r.ent.target);
         const zone = rt.ventile_offen !== undefined && rt.ventile_offen !== null;
@@ -300,7 +301,14 @@ class HeatingCorePanel extends HTMLElement {
     const budget = info.find((i) => has(i.t.schreib_budget_rest));
     const writes = budget ? `${budget.t.schreib_budget_rest}/${budget.t.schreib_budget}` : null;
     const big = has(kessel) ? fmt(kessel, 0) + " °C" : writes || "–";
-    s = `<rect class="box boiler" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
+    // Brenner (Ökofen, HEATING-24): brennt, solange er moduliert; Box und Text zeigen es
+    const k = fuel?.attributes?.kessel;
+    const burning = has(k?.modulation) ? Number(k.modulation) > 0 : null;
+    // zwei kurze Zeilen, die Box ist schmal: Zustand, darunter Leistung
+    const burner = burning === null ? [] : burning ? (narrow ? [`🔥 ${fmt(k.modulation, 0)} %`] : [`🔥 ${esc(k.burner_text || "Brenner an")}`, `${fmt(k.modulation, 0)} % Leistung`])
+      : ["Brenner aus", k.burner_text && k.burner_text !== "Aus" ? esc(k.burner_text) : ""];
+    s = `<rect class="box boiler ${burning === false ? "cold" : ""}" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
+      ${burner.filter(Boolean).map((t, i) => `<text class="s mid ${burning ? "burn" : ""}" x="${cx}" y="${cyB + 56 + i * 18}">${t}</text>`).join("")}
       <text class="s mid" x="${cx}" y="${cyB - 24}">${title}</text>
       <text class="big mid" x="${cx}" y="${cyB + 4}">${big}</text>
       ${!has(kessel) && writes ? `<text class="s mid" x="${cx}" y="${cyB + 24}">${narrow ? "Writes" : "Writes frei / h"}</text>` : ""}
@@ -672,7 +680,8 @@ const CSS = `
   .schema .box.hot { stroke: ${HOT}; } .schema .box.warnbox { stroke: ${WARN}; stroke-dasharray: 4 3; }
   .schema .lvl { fill: ${HOT}; opacity: .16; }
   .schema .pel.sm { font-size: 13px; } .schema .pel { font-size: 15px; font-weight: 600; fill: var(--primary-text-color); } .schema .pel.lv-ok { fill: #43a047; } .schema .pel.lv-mid { fill: ${WARN}; } .schema .pel.lv-low { fill: #e53935; }
-  .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; }
+  .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; } .schema .boiler.cold { fill: ${IDLE}12; stroke: ${IDLE}66; }
+  .schema .s.burn { fill: ${HOT}; font-weight: 600; }
   .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; } .schema .end { text-anchor: end; }
   .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
   .schema .s { font-size: 12px; fill: var(--secondary-text-color); }

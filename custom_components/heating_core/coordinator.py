@@ -390,7 +390,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             room_demand_delta=float(self.opt(OPT_ROOM_DEMAND_DELTA)) if lim.gentle else 0.0,
         )
         m_res = master_target(g, m_in, isolated)
-        out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence, window_open=win.open_too_long,
+        out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence, window_open=win.open_too_long, pump_on=state.pump_on,
                    current=current, budget_left=None, mode=_circuit_mode(m_res, m_in, g))
 
         for rid, rcfg in followers:
