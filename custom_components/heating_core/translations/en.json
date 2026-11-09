@@ -135,7 +135,7 @@
           },
           "description": "Devices and demand sources of the circuit. Set comfort and setback on its sliders afterwards.",
           "data_description": {
-            "master_climate": "The zone or circuit at the heat source that receives the setpoint.",
+            "master_climate": "The zone or circuit at the heat source that receives the setpoint. Ökofen: on the Pellematic, switch this circuit's room sensor off (room influence 0) and eco mode off – otherwise it shuts the circuit down itself (see README).",
             "presence_sensors": "Presence sensors in the leading room. Presence → comfort, even outside the schedule.",
             "schedule": "Schedule helper: on = comfort, off = setback. Rooms without their own schedule follow it. Without schedule and presence the circuit always uses comfort.",
             "window": "Window contact in the leading room. Open longer than the window delay → minimum.",
