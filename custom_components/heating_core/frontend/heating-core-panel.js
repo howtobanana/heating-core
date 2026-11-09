@@ -159,34 +159,35 @@ class HeatingCorePanel extends HTMLElement {
   }
 
   // Drehregler wie die HA-Thermostat-Karte: Bogen = Ist, Knopf = Komfort (ziehbar), Mitte = Komfort groß.
-  _dial(ist, comfortId, tone) {
+  // Drehregler: Mitte = was gerade gilt (Soll jetzt), darunter Ist; Knopf = Komfort (ziehbar, zeigt beim Ziehen den Komfort)
+  _dial(ist, comfortId, tone, soll) {
     const st = this._st(comfortId);
     const a = st?.attributes || {}, lo = Number(a.min ?? 16), hi = Number(a.max ?? 26);
     const f = (v) => Math.max(0, Math.min(1, (Number(v) - lo) / (hi - lo)));
     const C = 2 * Math.PI * 40, arc = C * 0.75;
     const knob = (v) => { const r = (135 + 270 * f(v)) * (Math.PI / 180); return [50 + 40 * Math.cos(r), 50 + 40 * Math.sin(r)]; };
     const [kx, ky] = st ? knob(st.state) : [0, 0];
+    const center = has(soll) ? soll : st?.state;
     return `<svg class="ring ${tone} ${st ? "dial" : ""}" viewBox="0 0 100 100" ${st ? `data-dial="${comfortId}" data-lo="${lo}" data-hi="${hi}" data-step="${a.step || 0.5}"` : ""}
         role="${st ? "slider" : "img"}" ${st ? `tabindex="0"` : ""} aria-label="Komfort" aria-valuemin="${lo}" aria-valuemax="${hi}" aria-valuenow="${st?.state ?? ""}">
       <circle class="track" cx="50" cy="50" r="40" stroke-dasharray="${arc} ${C}" transform="rotate(135 50 50)"/>
       <circle class="val" cx="50" cy="50" r="40" stroke-dasharray="${has(ist) ? arc * f(ist) : 0} ${C}" transform="rotate(135 50 50)"/>
       ${st ? `<circle class="mark" cx="${kx}" cy="${ky}" r="6.5"/>` : ""}
-      <text x="50" y="52" class="rv">${st ? fmt(st.state) + "°" : has(ist) ? fmt(ist) + "°" : "–"}</text>
-      <text x="50" y="67" class="rs">${st ? `Ist ${fmt(ist)}°` : "Ist"}</text></svg>`;
+      <text x="50" y="52" class="rv">${has(center) ? fmt(center) + "°" : "–"}</text>
+      <text x="50" y="67" class="rs">Ist ${fmt(ist)}°</text></svg>`;
   }
 
   _tile({ name, ist, soll, mode, problem, ent, note, iconSvg, plan }) {
     const tone = this._tone(mode, problem);
     const comfort = this._st(ent.comfort);
     const presence = this._on(ent.presence);
-    const now = has(soll) && !OFF_MODES.has(mode) ? ` · jetzt ${fmt(soll)}°` : "";
     return `<div class="tile ${tone}">
       <div class="tname">${iconSvg || ""}<span>${esc(name)}</span>${presence ? '<span class="dot" title="Präsenz">●</span>' : ""}</div>
-      ${this._dial(ist, ent.comfort, tone)}
-      <div class="tmode">${esc((problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–") + now)}</div>
+      ${this._dial(ist, ent.comfort, tone, soll)}
+      <div class="tmode">${esc(problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–")}</div>
       ${note ? `<div class="note">${esc(note)}</div>` : ""}
       ${comfort ? `<div class="stepper"><button data-step="${ent.comfort}" data-d="-1" aria-label="Komfort niedriger">−</button>
-        <span>Komfort</span>
+        <span>Komfort<b>${fmt(comfort.state)}°</b></span>
         <button data-step="${ent.comfort}" data-d="1" aria-label="Komfort höher">+</button></div>` : ""}
       ${plan ? this._planLine(plan) : ""}
       ${ent.pre_heat ? `<button class="chip ${this._on(ent.pre_heat) ? "on" : ""}" data-toggle="${ent.pre_heat}">Vorheizen</button>` : ""}
@@ -329,7 +330,7 @@ class HeatingCorePanel extends HTMLElement {
       tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow) }));
     }
     for (const z of i.rooms) {
-      tiles.push(this._tile({ ...z, plan: z.t.zeitplan !== t.zeitplan ? z.t.zeitplan : null, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) ? `Thermostat ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
+      tiles.push(this._tile({ ...z, plan: z.t.zeitplan !== t.zeitplan ? z.t.zeitplan : null, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) && has(z.soll) && Math.abs(z.t.trv_sollwert - z.soll) > 0.1 ? `Thermostat steht noch auf ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
     }
     return `<section class="group">
       <div class="ghead"><h2>${esc(i.name)}</h2>${this._badge(i.mode, i.problem)}</div>

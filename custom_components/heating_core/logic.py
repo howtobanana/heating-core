@@ -102,6 +102,8 @@ def room_target(g: Globals, r: RoomInput) -> RoomResult:
         mode = "summer"
     elif r.window_open_too_long:
         mode = "window"
+    elif g.away_effective and not pre_heat:
+        mode = "away"  # wie beim Heizkreis: Abwesend geht vor Zeitplan/Präsenz/Komfort
     elif r.schedule_on:
         mode = "schedule"
     elif r.presence_on:
