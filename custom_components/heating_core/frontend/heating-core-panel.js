@@ -238,7 +238,12 @@ class HeatingCorePanel extends HTMLElement {
     const top = rows[0].cy, bottom = rows[rows.length - 1].cy;
     const any = rows.some((r) => r.flow);
     // Kessel so hoch wie alle Heizkreise: jeder Kreis bekommt eine gerade Doppelleitung, nichts kreuzt sich
-    const boiler = { x: L.kessel[0], y: top - 34, w: L.kessel[1] - L.kessel[0], h: bottom - top + 68 };
+    // mindestens 120 hoch (bei nur einem Kreis sonst zu flach), mittig zu den Kreisen, nicht über den Rand
+    const bh = Math.max(bottom - top + 68, 120);
+    const shift = Math.max(0, 8 - ((top + bottom) / 2 - bh / 2));  // Kreise nach unten, damit die Box mittig bleibt
+    for (const r of rows) { r.cy += shift; for (const z of r.rooms) z.y += shift; }
+    y += shift;
+    const boiler = { x: L.kessel[0], y: (top + bottom) / 2 + shift - bh / 2, w: L.kessel[1] - L.kessel[0], h: bh };
     const H = Math.max(y, boiler.y + boiler.h) + 8;
     // Rohr: durchgehende Leitung, bei Fluss mit laufender Strichlinie darüber – Enden sitzen immer sauber an der Kante
     const pipe = (on, back, color, d, thin) => {
