@@ -239,3 +239,28 @@ async def test_eigene_absenkung_sperrt_rueckweg_nicht(hass: HomeAssistant) -> No
     assert coordinator.data["circuits"]["hk1"]["decision"] != "circuit_off"
     assert [c.data["option"] for c in sel] == ["2_heizen"]
     assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-1.0]  # 22,0 − 22,8, auf ganze Kelvin
+
+
+async def test_falsche_betriebsart_auch_in_hysterese(hass: HomeAssistant) -> None:
+    """Perg UG 09.11.2026: „absenken“ + 1 für Ziel 17 °C liegt in der Hysterese (hier genau 17),
+    die Absenk-Heizgrenze hält den Kreis trotzdem aus -> auf „heizen“ −3 umstellen (HEATING-18)."""
+    _hk1_states(hass, mode="3_absenken", text="Absenkbetrieb aktiv|Außentemp über Heizgrenze absenken")
+    hass.states.async_set(f"number.{HK1_B}_temp_heat", "20")
+    hass.states.async_set(f"number.{HK1_B}_temp_setback", "16")
+    hass.states.async_set(f"number.{HK1_B}_remote_override", "1")
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})
+    hass.states.async_set("schedule.hk1", "on")
+    entry = _hk1_entry(schedule="schedule.hk1")
+    coordinator = await _setup(hass, entry)
+    sel = async_mock_service(hass, "select", "select_option")
+    num = async_mock_service(hass, "number", "set_value")
+    async_mock_service(hass, "climate", "set_temperature")
+    coordinator.control.comfort["hk1"] = 17.0
+    coordinator.control.setback["hk1"] = 16.0  # wie die Pellematic, sonst hebt Eco 19 °C das Ziel
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
+        coordinator._started = 0
+        await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["would_write"] is False  # ohne Betriebsart-Prüfung bliebe es so
+    assert [c.data["option"] for c in sel] == ["2_heizen"]
+    assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-3.0]

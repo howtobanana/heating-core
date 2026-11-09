@@ -90,9 +90,15 @@ class OekofenAdapter:
         return CircuitState(setpoint, current, setpoint is not None,
                             heating_off=st.state == "off" and mode not in (MODE_HEAT, MODE_SETBACK))
 
-    def needs_takeover(self, master_entity: str) -> bool:
-        """Läuft der Kreis noch im eigenen Zeitprogramm (auto), obwohl Heating Core steuern soll?"""
-        return (self.hass.states.get(self._ids(master_entity)["mode"]) or _NONE).state == MODE_AUTO
+    def needs_takeover(self, master_entity: str, target: float) -> bool:
+        """Eigenes Zeitprogramm (auto) oder falsche Betriebsart für das Ziel – auch innerhalb der Hysterese
+        (Perg 09.11.2026: „absenken“ 15,5 + 1 für Ziel 17 hält die Heizgrenze den Kreis aus, HEATING-18)."""
+        ids = self._ids(master_entity)
+        mode = (self.hass.states.get(ids["mode"]) or _NONE).state
+        if mode == MODE_AUTO:
+            return True
+        heat, setback = self._num(ids["heat"]), self._num(ids["setback"])
+        return heat is not None and setback is not None and mode != choose_mode(target, heat, setback)
 
     async def release(self, master_entity: str) -> None:
         """Schreiben aus: Kreis zurück ans eigene Zeitprogramm (auto, Offset 0)."""

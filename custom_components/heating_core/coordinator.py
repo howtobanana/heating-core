@@ -408,7 +408,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         out["would_write"] = dec.write
         # Variante B: läuft die Anlage noch im eigenen Zeitprogramm, einmal übernehmen
         takeover = getattr(self.adapter, "needs_takeover", None)
-        takeover = bool(takeover and takeover(master_entity)) and not state.heating_off and now - self._started >= STARTUP_GUARD_S
+        takeover = bool(takeover and takeover(master_entity, m_res.target)) and not state.heating_off and now - self._started >= STARTUP_GUARD_S
         if (dec.write or takeover) and self.control.write_enabled:
             await self.adapter.write_setpoint(master_entity, m_res.target)
             self._events.append(f"{ccfg[F_NAME]}: {_de(state.setpoint)} → {_de(m_res.target)} °C ({MODE_TEXT.get(out['mode'], out['mode'])})")
