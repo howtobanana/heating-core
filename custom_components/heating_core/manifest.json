@@ -1,6 +1,11 @@
 {
   "domain": "heating_core",
   "name": "Heating Core",
+  "after_dependencies": [
+    "frontend",
+    "http",
+    "panel_custom"
+  ],
   "codeowners": [],
   "config_flow": true,
   "documentation": "https://github.com/howtobanana/heating-core",
@@ -8,11 +13,6 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/howtobanana/heating-core/issues",
   "requirements": [],
-  "version": "0.15.0",
-  "after_dependencies": [
-    "frontend",
-    "http",
-    "panel_custom"
-  ],
-  "single_config_entry": true
+  "single_config_entry": true,
+  "version": "0.15.0"
 }
