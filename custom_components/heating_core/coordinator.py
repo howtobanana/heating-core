@@ -702,6 +702,4 @@ def _circuit_mode(res, m_in: MasterInput, g: Globals) -> str:
         return "schedule"
     if m_in.presence_on:
         return "presence"
-    if not m_in.has_demand_source:
-        return "manual"
     return "eco"

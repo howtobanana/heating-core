@@ -59,7 +59,8 @@ class RoomResult:
 def room_base(g: Globals, r: RoomInput) -> tuple[float, bool]:
     """Zieltemperatur des Raums ohne Ein/Aus-Regelung (für Fußboden-Zonen) und ob Bedarf besteht."""
     pre_heat = r.pre_heat_on and not g.summer
-    active = r.schedule_on or r.presence_on or (not r.has_demand_source) or pre_heat
+    # ohne Zeitplan/Präsenz: Absenkung, nicht dauernd Komfort (Fabian, 09.11.2026)
+    active = r.schedule_on or r.presence_on or pre_heat
     if g.summer or r.window_open_too_long:
         return g.min_trv, active
     if g.away_effective and not pre_heat:
@@ -70,8 +71,8 @@ def room_base(g: Globals, r: RoomInput) -> tuple[float, bool]:
 def room_target(g: Globals, r: RoomInput) -> RoomResult:
     """Sollwert eines isolierten Raums."""
     pre_heat = r.pre_heat_on and not g.summer
-    manual = not r.has_demand_source
-    active = r.schedule_on or r.presence_on or manual or pre_heat
+    manual = False  # ohne Zeitplan/Präsenz: Absenkung, nicht dauernd Komfort (Fabian, 09.11.2026)
+    active = r.schedule_on or r.presence_on or pre_heat
 
     if g.away_effective and not pre_heat:
         base = g.away_temp
@@ -198,7 +199,7 @@ def master_target(
     """Sollwert für den Wärmeerzeuger eines Heizkreises."""
     away = g.away_effective
     pre_heat = m.pre_heat_on and not g.summer
-    manual = not m.has_demand_source
+    manual = False  # ohne Zeitplan/Präsenz: Absenkung, nicht dauernd Komfort (Fabian, 09.11.2026)
     presence = m.presence_on
     demand = m.comfort if (m.schedule_on or presence or manual or pre_heat) else g.eco
     target_temp = g.away_temp if (away and not pre_heat) else demand

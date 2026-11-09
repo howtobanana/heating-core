@@ -28,14 +28,18 @@ def _entry(**options) -> MockConfigEntry:
                                      "presence_sensors": [PRESENCE]},
                                subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
             ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": TRV, "comfort": 21.0,
-                                     "offset": -2.0},
+                                     "offset": -2.0, "schedule": IMMER},
                                subentry_id="raum1", subentry_type="room", title="Büro", unique_id=None),
         ],
     )
 
 
+IMMER = "schedule.immer"
+
+
 @pytest.fixture
 def states(hass: HomeAssistant):
+    hass.states.async_set(IMMER, "on")  # ohne Zeitplan gilt Absenkung (Fabian 09.11.2026) – Tests brauchen Komfort
     hass.states.async_set(ZONE, "heat_cool", {"temperature": 19, "current_temperature": 20, "min_temp": 7, "max_temp": 30})
     hass.states.async_set(TRV, "heat", {"temperature": 19, "current_temperature": 20.5})
     hass.states.async_set(PRESENCE, "on")
@@ -144,7 +148,7 @@ async def test_trv_wird_auch_ohne_master_geschrieben(hass: HomeAssistant, states
         domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
         options={"eco_temp": 19.0, "min_trv_temp": 8.0, "window_delay_s": 10, "presence_activation_min": 0, "boost_enabled": False},
         subentries_data=[
-            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0},
+            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0, "schedule": IMMER},
                                subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
             ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": TRV, "comfort": 21.0, "window": window},
                                subentry_id="raum1", subentry_type="room", title="Büro", unique_id=None),
@@ -171,7 +175,7 @@ async def test_trv_fehler_stoppt_andere_raeume_nicht(hass: HomeAssistant, states
         domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
         options={"eco_temp": 19.0, "min_trv_temp": 8.0, "presence_activation_min": 0, "boost_enabled": False},
         subentries_data=[
-            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0},
+            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0, "schedule": IMMER},
                                subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
             ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": TRV, "comfort": 25.0},
                                subentry_id="raum1", subentry_type="room", title="Büro", unique_id=None),

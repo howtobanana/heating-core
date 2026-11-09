@@ -42,7 +42,7 @@ def _entry() -> MockConfigEntry:
         data={"name": "Perg", "manufacturer": "oekofen"},
         options={"eco_temp": 19.0, "away_temp": 17.0, "min_trv_temp": 8.0, "presence_activation_min": 0},
         subentries_data=[
-            ConfigSubentryData(data={"kind": "floor_external", "comfort": 22.0, "pump_switch": L1,
+            ConfigSubentryData(data={"kind": "floor_external", "comfort": 22.0, "pump_switch": L1, "schedule": "schedule.immer",
                                      "source_temp_sensor": KESSEL, "source_on": 50.0, "source_off": 45.0,
                                      "valve_delay_s": 0},
                                subentry_id="hk3", subentry_type="circuit", title="HK3 Fussboden", unique_id=None),
@@ -57,6 +57,7 @@ def _entry() -> MockConfigEntry:
 
 @pytest.fixture
 def perg(hass: HomeAssistant):
+    hass.states.async_set("schedule.immer", "on")  # ohne Zeitplan gilt Absenkung (Fabian 09.11.2026)
     hass.states.async_set(KESSEL, "70.7")
     hass.states.async_set(WOHN_TEMP, "20.0")
     hass.states.async_set(L1, "off")
@@ -148,6 +149,7 @@ HK1_B = "pellematic_heating_circuit_1"
 
 def _hk1_states(hass, mode="1_auto", text="Heizbetrieb aktiv|Raumtemperatur erreicht"):
     """Werte aus HA Perg vom 08.11.2026, 20:45: l_roomtemp_set fällt auf 8 °C."""
+    hass.states.async_set("schedule.immer", "on")
     hass.states.async_set(HK1, "auto", {"temperature": 8.0, "current_temperature": 21.0, "min_temp": 7, "max_temp": 35})
     hass.states.async_set(f"sensor.{HK1_B}_l_roomtemp_set", "8")
     hass.states.async_set(f"sensor.{HK1_B}_l_roomtemp_act", "21.0")
@@ -158,7 +160,7 @@ def _hk1_states(hass, mode="1_auto", text="Heizbetrieb aktiv|Raumtemperatur erre
     hass.states.async_set(f"select.{HK1_B}_mode_auto", mode)
 
 
-def _hk1_entry(schedule=None) -> MockConfigEntry:
+def _hk1_entry(schedule="schedule.immer") -> MockConfigEntry:
     data = {"kind": "radiator", "master_climate": HK1, "comfort": 22.0}
     if schedule:
         data["schedule"] = schedule

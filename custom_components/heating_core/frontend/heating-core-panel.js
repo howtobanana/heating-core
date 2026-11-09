@@ -208,7 +208,7 @@ class HeatingCorePanel extends HTMLElement {
   // Zeitplan-Knopf öffnet den eigenen Editor (HEATING-20); ohne Plan: „Zeitplan anlegen“ (Raum: Vorlage = Plan des Kreises)
   _planLine(id, target, name, seed) {
     const attrs = `data-plan="${esc(id || "")}" data-target="${esc(target || "")}" data-name="${esc(name || "")}" data-seed="${esc(seed || "")}"`;
-    if (!id) return `<button class="plan add" ${attrs}>${seed ? "Eigener Zeitplan" : "Kein Zeitplan – immer Komfort · anlegen"}</button>`;
+    if (!id) return `<button class="plan add" ${attrs}>${seed ? "Eigener Zeitplan" : "Kein Zeitplan – Absenkung · anlegen"}</button>`;
     const st = this._st(id);
     const next = st?.attributes?.next_event ? new Date(st.attributes.next_event).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) : "";
     return `<button class="plan ${st?.state === "on" ? "on" : ""}" ${attrs} title="Zeitplan bearbeiten">

@@ -53,9 +53,9 @@ def test_raum_deadband_startet_erst_unter_hysterese():
     assert r.target == 19
 
 
-def test_raum_ohne_quelle_ist_manuell_aktiv():
+def test_raum_ohne_quelle_ist_absenkung():
     r = room_target(G, room(has_demand_source=False))
-    assert (r.mode, r.active) == ("manual", True)
+    assert (r.mode, r.active, r.target) == ("eco", False, G.eco)  # ohne Zeitplan: Absenkung (Fabian 09.11.2026)
 
 
 def test_raum_fenster_offen_minimum():
