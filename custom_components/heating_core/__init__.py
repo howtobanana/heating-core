@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from .adapters import get_adapter
 from .const import CONF_MANUFACTURER, DOMAIN, F_MASTER
 from .coordinator import HeatingCoordinator
+from .websocket import async_setup as async_setup_ws
 
 PANEL_URL = "heizung"
 STATIC_URL = "/heating_core_static"
@@ -24,6 +25,7 @@ type HeatingConfigEntry = ConfigEntry[HeatingCoordinator]
 
 async def async_setup_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> bool:
     await _register_panel(hass)
+    async_setup_ws(hass)
     coordinator = HeatingCoordinator(hass, entry)
     entry.runtime_data = coordinator
     await coordinator.async_load()
@@ -71,7 +73,7 @@ async def _register_panel(hass: HomeAssistant) -> None:
         webcomponent_name="heating-core-panel",
         sidebar_title="Heizung",
         sidebar_icon="mdi:radiator",
-        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.11.0",
+        module_url=f"{STATIC_URL}/heating-core-panel.js?v=0.13.0",
         require_admin=False,
     )
     hass.data[f"{DOMAIN}_panel"] = True

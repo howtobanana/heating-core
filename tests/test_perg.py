@@ -288,3 +288,18 @@ async def test_traeger_kessel_kurze_absenkung_und_starts(hass: HomeAssistant) ->
     hass.states.async_set("sensor.pellematic_pellematic_1_l_starts", "5132")
     await coordinator.async_refresh()
     assert coordinator.data["starts_today"] == 2
+
+
+async def test_zeitplan_zuordnen_per_websocket(hass: HomeAssistant, hass_ws_client) -> None:
+    """HEATING-20: Der Editor legt einen HA-Zeitplan an und ordnet ihn über heating_core/assign_schedule zu."""
+    _hk1_states(hass, mode="2_heizen")
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})
+    entry = _hk1_entry()
+    await _setup(hass, entry)
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "heating_core/assign_schedule", "entity_id": "sensor.buero_setpoint", "schedule": "schedule.heizplan_buero"})
+    res = await client.receive_json()
+    assert res["success"], res
+    assert entry.subentries["buero"].data["schedule"] == "schedule.heizplan_buero"
+    await client.send_json({"id": 2, "type": "heating_core/assign_schedule", "entity_id": "sensor.buero_setpoint", "schedule": "light.x"})
+    assert not (await client.receive_json())["success"]

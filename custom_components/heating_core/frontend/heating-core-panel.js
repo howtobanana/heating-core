@@ -64,7 +64,7 @@ class HeatingCorePanel extends HTMLElement {
     }
     const sig = this._ids.map((id) => hass.states[id]?.last_updated).join("|") + this._narrow;
     if (sig === this._sig) return;
-    if (this._dragging || this._queued) return;
+    if (this._dragging || this._queued || this._editing) return;
     this._sig = sig;
     this._queued = true;
     requestAnimationFrame(() => { this._queued = false; this._render(); });
@@ -177,7 +177,7 @@ class HeatingCorePanel extends HTMLElement {
       <text x="50" y="67" class="rs">Ist ${fmt(ist)}°</text></svg>`;
   }
 
-  _tile({ name, ist, soll, mode, problem, ent, note, iconSvg, plan }) {
+  _tile({ name, ist, soll, mode, problem, ent, note, iconSvg, plan, seed }) {
     const tone = this._tone(mode, problem);
     const comfort = this._st(ent.comfort);
     const presence = this._on(ent.presence);
@@ -189,7 +189,7 @@ class HeatingCorePanel extends HTMLElement {
       ${comfort ? `<div class="stepper"><button data-step="${ent.comfort}" data-d="-1" aria-label="Komfort niedriger">−</button>
         <span>Komfort<b>${fmt(comfort.state)}°</b></span>
         <button data-step="${ent.comfort}" data-d="1" aria-label="Komfort höher">+</button></div>` : ""}
-      ${plan ? this._planLine(plan) : ""}
+      ${plan !== undefined ? this._planLine(plan, ent.target, name, plan ? null : seed) : ""}
       ${ent.pre_heat ? `<button class="chip ${this._on(ent.pre_heat) ? "on" : ""}" data-toggle="${ent.pre_heat}">Vorheizen</button>` : ""}
     </div>`;
   }
@@ -203,12 +203,22 @@ class HeatingCorePanel extends HTMLElement {
   }
 
   // Zeitplan (HA-Zeitplan-Helfer): an/aus bis …, Klick öffnet die Helfer
-  _planLine(id) {
-    if (!id) return `<div class="note">Kein Zeitplan – immer Komfort</div>`;
+  // Zeitplan-Knopf öffnet den eigenen Editor (HEATING-20); ohne Plan: „Zeitplan anlegen“ (Raum: Vorlage = Plan des Kreises)
+  _planLine(id, target, name, seed) {
+    const attrs = `data-plan="${esc(id || "")}" data-target="${esc(target || "")}" data-name="${esc(name || "")}" data-seed="${esc(seed || "")}"`;
+    if (!id) return `<button class="plan add" ${attrs}>${seed ? "Eigener Zeitplan" : "Kein Zeitplan – immer Komfort · anlegen"}</button>`;
     const st = this._st(id);
     const next = st?.attributes?.next_event ? new Date(st.attributes.next_event).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) : "";
-    return `<button class="plan ${st?.state === "on" ? "on" : ""}" data-nav="/config/helpers" title="${esc(id)}">
-      Zeitplan ${st?.state === "on" ? "Komfort" : "Absenkung"}${next ? ` bis ${next}` : ""}</button>`;
+    return `<button class="plan ${st?.state === "on" ? "on" : ""}" ${attrs} title="Zeitplan bearbeiten">
+      Zeitplan ${st?.state === "on" ? "Komfort" : "Absenkung"}${next ? ` bis ${next}` : ""} ✎</button>`;
+  }
+
+  _openPlan(b) {
+    const ed = document.createElement("hc-schedule-editor");
+    this._editing = true;
+    ed.addEventListener("closed", () => { this._editing = false; this._sig = null; this.hass = this._hass; });
+    this.shadowRoot.appendChild(ed);
+    ed.open({ hass: this._hass, schedule: b.dataset.plan || null, target: b.dataset.target, name: b.dataset.name, seed: b.dataset.seed || null });
   }
 
   // ---- Schema: Kessel → Verteiler (Vorlauf/Rücklauf) → Pumpe → Heizkreis → Räume ----
@@ -330,12 +340,12 @@ class HeatingCorePanel extends HTMLElement {
       tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow) }));
     }
     for (const z of i.rooms) {
-      tiles.push(this._tile({ ...z, plan: z.t.zeitplan !== t.zeitplan ? z.t.zeitplan : null, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) && has(z.soll) && Math.abs(z.t.trv_sollwert - z.soll) > 0.1 ? `Thermostat steht noch auf ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
+      tiles.push(this._tile({ ...z, plan: z.t.zeitplan !== t.zeitplan ? z.t.zeitplan : null, seed: t.zeitplan, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) && has(z.soll) && Math.abs(z.t.trv_sollwert - z.soll) > 0.1 ? `Thermostat steht noch auf ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
     }
     return `<section class="group">
       <div class="ghead"><h2>${esc(i.name)}</h2>${this._badge(i.mode, i.problem)}</div>
       <div class="gmeta">${esc(meta)}</div>
-      <div class="gctl">${this._planLine(t.zeitplan)}${this._setback(i.ent.setback)}</div>
+      <div class="gctl">${this._planLine(t.zeitplan, i.ent.target, i.name)}${this._setback(i.ent.setback)}</div>
       ${i.problem ? `<div class="alert">${esc(PROBLEMS[i.problem] || i.problem)}</div>` : ""}
       ${would ? `<div class="would">Würde schalten: ${would}</div>` : ""}
       <div class="tiles">${tiles.join("")}</div>
@@ -407,6 +417,7 @@ class HeatingCorePanel extends HTMLElement {
       history.pushState(null, "", b.dataset.nav);
       window.dispatchEvent(new CustomEvent("location-changed"));
     }));
+    this.shadowRoot.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", () => this._openPlan(b)));
     this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d))));
     this.shadowRoot.querySelectorAll("[data-dial]").forEach((svg) => this._wireDial(svg));
     this.shadowRoot.querySelectorAll("[data-number]").forEach((inp) => {
@@ -417,6 +428,205 @@ class HeatingCorePanel extends HTMLElement {
     });
   }
 }
+
+// ---- Zeitplan-Editor (HEATING-20) -------------------------------------------
+// Bearbeitet den HA-Zeitplan-Helfer direkt (schedule/list, schedule/update, schedule/create): HA bleibt die einzige Quelle.
+// Wochenraster Mo–So, Komfort-Blöcke ziehen (15 min), antippen zum Ändern/Löschen, Tag auf andere Tage kopieren.
+const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const DAY_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const STEP = 15; // Minuten
+const toMin = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + (m || 0); };
+const toTime = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00`;
+const hhmm = (m) => toTime(m).slice(0, 5);
+
+// Blöcke sortieren, überlappende/anschließende zusammenlegen, leere verwerfen
+function normalizeDay(blocks) {
+  const out = [];
+  for (const b of [...blocks].filter((b) => b.to > b.from).sort((a, b) => a.from - b.from)) {
+    const last = out[out.length - 1];
+    if (last && b.from <= last.to) last.to = Math.max(last.to, b.to);
+    else out.push({ from: b.from, to: b.to });
+  }
+  return out;
+}
+
+class HcScheduleEditor extends HTMLElement {
+  constructor() { super(); this.attachShadow({ mode: "open" }); this._sel = null; this._copy = null; }
+
+  // opts: { hass, schedule (entity_id oder null), target (Sensor-Entität des Kreises/Raums), name, seed (Plan als Vorlage) }
+  async open(opts) {
+    Object.assign(this, opts);
+    this._err = "";
+    this._days = DAYS.map(() => []);
+    this._item = null;
+    try {
+      const src = this.schedule || this.seed;
+      if (src) {
+        const reg = await this.hass.callWS({ type: "config/entity_registry/get", entity_id: src });
+        const items = await this.hass.callWS({ type: "schedule/list" });
+        const item = items.find((i) => i.id === reg.unique_id);
+        if (!item) throw new Error("Zeitplan nicht gefunden");
+        if (this.schedule) this._item = item;
+        this._days = DAYS.map((d) => normalizeDay((item[d] || []).map((b) => ({ from: toMin(b.from), to: toMin(b.to) }))));
+      }
+    } catch (e) { this._err = e.message || String(e); }
+    this._render();
+  }
+
+  _close(saved) { this.dispatchEvent(new CustomEvent("closed", { detail: { saved } })); this.remove(); }
+
+  async _save() {
+    const days = Object.fromEntries(DAYS.map((d, i) => [d, normalizeDay(this._days[i]).map((b) => ({ from: toTime(b.from), to: b.to >= 1440 ? "24:00:00" : toTime(b.to) }))]));
+    this._busy = true; this._render();
+    try {
+      if (this._item) {
+        const { id, ...rest } = this._item;
+        await this.hass.callWS({ type: "schedule/update", schedule_id: id, ...rest, ...days });
+      } else {
+        const item = await this.hass.callWS({ type: "schedule/create", name: `Heizplan ${this.name}`, icon: "mdi:radiator", ...days });
+        const ents = await this.hass.callWS({ type: "config/entity_registry/list" });
+        const ent = ents.find((e) => e.platform === "schedule" && e.unique_id === item.id);
+        if (!ent) throw new Error("Neuer Zeitplan hat keine Entität");
+        await this.hass.callWS({ type: "heating_core/assign_schedule", entity_id: this.target, schedule: ent.entity_id });
+      }
+      this._close(true);
+    } catch (e) {
+      this._busy = false;
+      this._err = e.message || String(e);
+      this._render();
+    }
+  }
+
+  _minAt(track, x) {
+    const r = track.getBoundingClientRect();
+    return Math.max(0, Math.min(1440, Math.round(((x - r.left) / r.width) * 1440 / STEP) * STEP));
+  }
+
+  _render() {
+    const sel = this._sel;
+    const rows = this._days.map((blocks, d) => `
+      <div class="row">
+        <span class="day">${DAY_DE[d]}</span>
+        <div class="track" data-day="${d}">
+          ${[6, 12, 18].map((h) => `<i class="tick" style="left:${(h / 24) * 100}%"></i>`).join("")}
+          ${blocks.map((b, k) => `<button class="blk ${sel && sel.d === d && sel.k === k ? "sel" : ""}" data-d="${d}" data-k="${k}"
+              style="left:${(b.from / 1440) * 100}%;width:${((b.to - b.from) / 1440) * 100}%" aria-label="${DAY_DE[d]} ${hhmm(b.from)}–${hhmm(b.to)}">
+              <span>${hhmm(b.from)}–${hhmm(b.to)}</span></button>`).join("")}
+        </div>
+        <button class="cp" data-copy="${d}" aria-label="${DAY_DE[d]} kopieren" title="Tag kopieren">⧉</button>
+      </div>
+      ${sel && sel.d === d ? this._editRow(blocks[sel.k]) : ""}
+      ${this._copy === d ? this._copyRow(d) : ""}`).join("");
+    this.shadowRoot.innerHTML = `<style>${EDITOR_CSS}</style>
+      <div class="back"></div>
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="Zeitplan ${esc(this.name)}">
+        <h2>Zeitplan ${esc(this.name)}</h2>
+        <p class="hint">Farbige Blöcke = Komfort, sonst Absenkung. Ziehen legt einen Block an, Antippen ändert ihn.</p>
+        ${this._err ? `<div class="err">${esc(this._err)}</div>` : ""}
+        <div class="hours"><span></span><div>${[0, 6, 12, 18, 24].map((h) => `<b style="left:${(h / 24) * 100}%">${h}</b>`).join("")}</div><span></span></div>
+        ${rows}
+        <div class="foot"><button class="ghost" data-act="cancel">Abbrechen</button>
+          <button class="primary" data-act="save" ${this._busy ? "disabled" : ""}>${this._item ? "Speichern" : "Zeitplan anlegen"}</button></div>
+      </div>`;
+    const $ = (q) => this.shadowRoot.querySelectorAll(q);
+    $("[data-act=cancel]").forEach((b) => b.addEventListener("click", () => this._close(false)));
+    this.shadowRoot.querySelector(".back").addEventListener("click", () => this._close(false));
+    $("[data-act=save]").forEach((b) => b.addEventListener("click", () => this._save()));
+    $(".blk").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const d = Number(b.dataset.d), k = Number(b.dataset.k);
+      this._sel = sel && sel.d === d && sel.k === k ? null : { d, k };
+      this._copy = null;
+      this._render();
+    }));
+    $(".cp").forEach((b) => b.addEventListener("click", () => { this._copy = this._copy === Number(b.dataset.copy) ? null : Number(b.dataset.copy); this._sel = null; this._render(); }));
+    $(".track").forEach((t) => this._wireTrack(t));
+    $("[data-edit]").forEach((inp) => inp.addEventListener("change", () => {
+      const b = this._days[sel.d][sel.k];
+      const v = inp.value ? toMin(inp.value) : 0;
+      if (inp.dataset.edit === "from") b.from = v; else b.to = v === 0 ? 1440 : v;
+      this._days[sel.d] = normalizeDay(this._days[sel.d]);
+      this._sel = null;
+      this._render();
+    }));
+    $("[data-act=del]").forEach((b) => b.addEventListener("click", () => { this._days[sel.d].splice(sel.k, 1); this._sel = null; this._render(); }));
+    $("[data-act=apply]").forEach((b) => b.addEventListener("click", () => {
+      const src = this._days[this._copy];
+      $("[data-to]:checked").forEach((c) => { this._days[Number(c.dataset.to)] = src.map((x) => ({ ...x })); });
+      this._copy = null;
+      this._render();
+    }));
+  }
+
+  _editRow(b) {
+    return `<div class="edit"><label>von <input type="time" step="900" data-edit="from" value="${hhmm(b.from)}"></label>
+      <label>bis <input type="time" step="900" data-edit="to" value="${b.to >= 1440 ? "00:00" : hhmm(b.to)}"></label>
+      <button class="ghost danger" data-act="del">Löschen</button></div>`;
+  }
+
+  _copyRow(d) {
+    return `<div class="edit">Kopieren auf ${DAY_DE.map((n, i) => i === d ? "" : `<label class="ck"><input type="checkbox" data-to="${i}" ${(d < 5) === (i < 5) ? "checked" : ""}>${n}</label>`).join("")}
+      <button class="primary" data-act="apply">Übernehmen</button></div>`;
+  }
+
+  // Ziehen auf freier Fläche legt einen Komfort-Block an (15-min-Raster)
+  _wireTrack(track) {
+    const d = Number(track.dataset.day);
+    track.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".blk")) return;
+      e.preventDefault();
+      track.setPointerCapture(e.pointerId);
+      const start = this._minAt(track, e.clientX);
+      const ghost = document.createElement("div");
+      ghost.className = "blk ghostblk";
+      track.appendChild(ghost);
+      let end = start;
+      const draw = () => { const a = Math.min(start, end), b = Math.max(start, end); ghost.style.left = `${(a / 1440) * 100}%`; ghost.style.width = `${((b - a) / 1440) * 100}%`; ghost.textContent = b > a ? `${hhmm(a)}–${hhmm(b)}` : ""; };
+      const move = (ev) => { end = this._minAt(track, ev.clientX); draw(); };
+      const up = () => {
+        track.removeEventListener("pointermove", move);
+        let a = Math.min(start, end), b = Math.max(start, end);
+        if (b - a < STEP) { a = Math.min(start, 1440 - 60); b = a + 60; } // Tippen: 1-h-Block
+        this._days[d] = normalizeDay([...this._days[d], { from: a, to: b }]);
+        this._sel = null;
+        this._render();
+      };
+      track.addEventListener("pointermove", move);
+      track.addEventListener("pointerup", up, { once: true });
+      draw();
+    });
+  }
+}
+
+const EDITOR_CSS = `
+  :host { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+  .back { position: absolute; inset: 0; background: #0008; }
+  .dlg { position: relative; background: var(--card-background-color); color: var(--primary-text-color); border-radius: 20px; padding: 18px 16px;
+    width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box; }
+  h2 { margin: 0 0 4px; font-size: 18px; } .hint { margin: 0 0 12px; font-size: 13px; color: var(--secondary-text-color); }
+  .err { background: ${WARN}22; border: 1px solid ${WARN}; border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }
+  .row, .hours { display: grid; grid-template-columns: 28px 1fr 32px; align-items: center; gap: 8px; margin: 6px 0; }
+  .hours div { position: relative; height: 16px; font-size: 11px; color: var(--secondary-text-color); }
+  .hours b { position: absolute; transform: translateX(-50%); font-weight: 400; } .hours b:first-child { transform: none; } .hours b:last-child { transform: translateX(-100%); }
+  .day { font-size: 13px; font-weight: 600; }
+  .track { position: relative; height: 40px; background: ${COLD}18; border-radius: 10px; touch-action: none; cursor: crosshair; }
+  .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--divider-color); }
+  .blk { position: absolute; top: 3px; bottom: 3px; background: ${HOT}; color: #fff; border: 0; border-radius: 8px; padding: 0 4px; font: inherit; font-size: 11px;
+    overflow: hidden; white-space: nowrap; display: flex; align-items: center; justify-content: center; min-width: 4px; box-sizing: border-box; }
+  .blk.sel { outline: 3px solid var(--primary-color); outline-offset: 1px; } .ghostblk { opacity: .6; pointer-events: none; }
+  .cp { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font-size: 15px; }
+  .edit { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 2px 0 10px 36px; font-size: 13px; }
+  .edit input[type=time] { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); }
+  .ck { display: inline-flex; gap: 4px; align-items: center; }
+  .foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+  .primary, .ghost { border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; border: 1px solid var(--primary-color); }
+  .primary { background: var(--primary-color); color: var(--text-primary-color, #fff); } .ghost { background: transparent; color: var(--primary-text-color); border-color: var(--divider-color); }
+  .danger { color: #e53935; border-color: #e5393588; }
+  @media (max-width: 600px) { .blk span { display: none; } }
+  button:not(:disabled), label:has(input:not(:disabled)) { cursor: pointer; } :disabled { cursor: not-allowed; opacity: .6; }
+`;
+
+if (!customElements.get("hc-schedule-editor")) customElements.define("hc-schedule-editor", HcScheduleEditor);
 
 const CSS = `
   :host { display:block; background: var(--primary-background-color); color: var(--primary-text-color); min-height:100vh; }
@@ -490,7 +700,7 @@ const CSS = `
   .mini button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font-size: 14px; line-height: 1; }
   .mini b { color: var(--primary-text-color); }
   .plan { border: 0; background: var(--secondary-background-color); color: var(--secondary-text-color); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; margin-top: 4px; }
-  .plan.on { background: ${HOT}22; color: var(--primary-text-color); }
+  .plan.on { background: ${HOT}22; color: var(--primary-text-color); } .plan.add { border: 1px dashed var(--divider-color); background: transparent; }
   .chip { border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin-top: 4px; }
   .chip.on { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
   .slider { display:grid; grid-template-columns: 90px 1fr 70px; align-items:center; gap:8px; font-size: 14px; margin: 8px 0; }

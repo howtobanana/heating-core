@@ -8,3 +8,9 @@ node tests/ui/build.mjs > /tmp/heizung.mjs && ~/Developer/_werkzeuge/ui-test-unr
 
 Ergebnis: Desktop und Handy, je hell und dunkel. `perg.json` ist ein Abzug aus HA Perg
 (Template über `integration_entities('heating_core')`, `key` = translation_key der Entität).
+
+Zeitplan-Editor (HEATING-20) geöffnet zeigen:
+
+```bash
+node tests/ui/build.mjs tests/ui/perg.json tests/ui/zeitplan.js > /tmp/zeitplan.mjs && ~/Developer/_werkzeuge/ui-test-unraid.sh /tmp/zeitplan.mjs tests/ui/out
+```
