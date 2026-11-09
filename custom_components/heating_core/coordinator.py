@@ -14,6 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .adapters import get_adapter
 from .notify import Notifier
@@ -59,6 +60,7 @@ from .const import (
     OPT_MIN_TRV,
     OPT_OUTDOOR_SENSOR,
     OPT_PRE_HEAT_TIMEOUT_MIN,
+    OPT_ROOM_DEMAND_DELTA,
     OPT_SUMMER_ENTITY,
     OPT_WEATHER_ENABLED,
     OPT_WEATHER_ZONE1,
@@ -67,6 +69,10 @@ from .const import (
     OPT_WINDOW_DELAY_S,
     OPT_WINDOW_SETTLE_S,
     STARTUP_GUARD_S,
+    GENTLE_HOLD_S,
+    GENTLE_MIN_HYSTERESIS,
+    GENTLE_PRE_HEAT_LEAD_S,
+    GENTLE_SHORT_SETBACK_S,
     SUB_CIRCUIT,
     SUB_ROOM,
     UPDATE_INTERVAL_S,
@@ -111,6 +117,8 @@ class ControlState:
     summer_off: set[str] = field(default_factory=set)  # Master, die Heating Core wegen Sommer ausgeschaltet hat  # TRV -> (Zeit, geschriebener Sollwert)
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
+    write_events: dict[str, tuple] = field(default_factory=dict)  # Kreis -> Ereignislage beim letzten Write (HEATING-19)
+    starts_base: dict[str, Any] = field(default_factory=dict)  # Brennerstarts zu Tagesbeginn: {"date", "count"}
 
 
 class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -289,6 +297,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fuel = getattr(self.adapter, "fuel", None)
         masters = [c[F_MASTER] for c in self.circuits().values() if c.get(F_MASTER)]
         result["fuel_kg"], result["fuel_max_kg"] = fuel(masters[0]) if fuel and masters else (None, None)
+        result["starts_today"] = await self._starts_today(masters[0] if masters else None)
         try:
             await self.notifier.update(result, self._events, ready=now - self._started >= STARTUP_GUARD_S)
         except (HomeAssistantError, ValueError) as err:  # Meldungen dürfen die Regelung nie stoppen
@@ -348,7 +357,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._write_rooms(out, g, now)
             return out
         m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
-        m_schedule = self._on(ccfg.get(F_SCHEDULE))
+        m_schedule = self._gentle_schedule(ccfg.get(F_SCHEDULE), now) if lim.gentle else self._on(ccfg.get(F_SCHEDULE))
         m_in = MasterInput(
             comfort=self._comfort(ccfg, cid),
             current_temp=current,
@@ -375,6 +384,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             humidity_enabled=bool(self.opt(OPT_HUMIDITY_ENABLED)),
             humidity=self._num(ccfg.get(F_HUMIDITY)),
             humidity_drop=float(self.opt(OPT_HUMIDITY_DROP)),
+            room_demand_delta=float(self.opt(OPT_ROOM_DEMAND_DELTA)) if lim.gentle else 0.0,
         )
         m_res = master_target(g, m_in, isolated)
         out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence, window_open=win.open_too_long,
@@ -385,13 +395,20 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": "follower", "target": t, "entity": rcfg[F_CLIMATE], "setpoint": self._attr(rcfg[F_CLIMATE], "temperature")}
 
         writes = self.control.writes.setdefault(cid, [])
+        # Ereignis seit dem letzten Write (Abwesend, Sommer, Fenster/Minimum, Vorheizen) hebt die Haltezeit auf
+        events = (g.away_effective, g.summer, m_res.forced_min, m_in.pre_heat_on)
+        event_changed = cid in self.control.write_events and self.control.write_events[cid] != events
+        hold_s = GENTLE_HOLD_S if lim.gentle else 0.0
+        held = bool(writes) and now - writes[-1].ts < hold_s and not event_changed
         dec = decide(
             now=now,
             target=m_res.target,
             set_now=state.setpoint,
             writes=writes,
-            cfg=WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET)), hysteresis=g.hysteresis, confirm_delay_s=lim.confirm_delay_s,
-                            budget_limited=lim.write_budget),
+            cfg=WriteConfig(budget_per_hour=int(self.opt(OPT_BUDGET)), confirm_delay_s=lim.confirm_delay_s, budget_limited=lim.write_budget,
+                            hysteresis=max(g.hysteresis, GENTLE_MIN_HYSTERESIS) if lim.gentle else g.hysteresis,
+                            min_hold_s=hold_s, symmetric_hysteresis=lim.gentle),
+            bypass=event_changed,
             forced_min=m_res.forced_min,
             away=g.away_effective,
             renew_due=state.renew_due,
@@ -408,12 +425,14 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         out["would_write"] = dec.write
         # Variante B: läuft die Anlage noch im eigenen Zeitprogramm, einmal übernehmen
         takeover = getattr(self.adapter, "needs_takeover", None)
-        takeover = bool(takeover and takeover(master_entity, m_res.target)) and not state.heating_off and now - self._started >= STARTUP_GUARD_S
+        takeover = (bool(takeover and takeover(master_entity, m_res.target)) and not state.heating_off and not held
+                    and now - self._started >= STARTUP_GUARD_S)
         if (dec.write or takeover) and self.control.write_enabled:
             await self.adapter.write_setpoint(master_entity, m_res.target)
             self._events.append(f"{ccfg[F_NAME]}: {_de(state.setpoint)} → {_de(m_res.target)} °C ({MODE_TEXT.get(out['mode'], out['mode'])})")
             writes.append(Write(now, m_res.target, dec.kind))
             del writes[:-20]
+            self.control.write_events[cid] = events
 
         await self._write_rooms(out, g, now)
         return out
@@ -421,6 +440,34 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
         self.control.summer_off = set(data.get("summer_off", []))
+        self.control.starts_base = data.get("starts_base", {})
+
+    async def _save(self) -> None:
+        await self._store.async_save({"summer_off": sorted(self.control.summer_off), "starts_base": self.control.starts_base})
+
+    async def _starts_today(self, master_entity: str | None) -> float | None:
+        """Brennerstarts seit Mitternacht (Ökofen), Tagesanfang überlebt Neustarts (HEATING-19)."""
+        starts = getattr(self.adapter, "starts", None)
+        count = starts(master_entity) if starts and master_entity else None
+        if count is None:
+            return None
+        today = dt_util.now().date().isoformat()
+        if self.control.starts_base.get("date") != today or count < self.control.starts_base.get("count", 0):
+            self.control.starts_base = {"date": today, "count": count}
+            await self._save()
+        return count - self.control.starts_base["count"]
+
+    def _gentle_schedule(self, entity_id: str | None, now: float) -> bool:
+        """Träger Kessel: Absenkphasen unter 3 h überspringen, Komfort 1 h vor dem Zeitplan (HEATING-19)."""
+        if not entity_id or self._on(entity_id):
+            return self._on(entity_id)
+        st = self.hass.states.get(entity_id)
+        nxt = dt_util.parse_datetime(str(st.attributes.get("next_event"))) if st and st.attributes.get("next_event") else None
+        if nxt is None:
+            return False
+        remaining = nxt.timestamp() - now
+        phase = nxt.timestamp() - st.last_changed.timestamp()
+        return 0 <= remaining <= GENTLE_PRE_HEAT_LEAD_S or 0 < phase < GENTLE_SHORT_SETBACK_S
 
     async def _summer(self, master_entity: str, ccfg: dict, g: Globals, now: float) -> None:
         """Vaillant: im Sommer Therme aus, danach Betriebsart zurück – nur, wenn Heating Core sie ausgeschaltet hat."""
@@ -431,12 +478,12 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if master_entity not in self.control.summer_off:
                 await summer(master_entity, True, None)
                 self.control.summer_off.add(master_entity)
-                await self._store.async_save({"summer_off": sorted(self.control.summer_off)})
+                await self._save()
                 self._events.append(f"{ccfg[F_NAME]}: Sommer – Heizung aus")
         elif master_entity in self.control.summer_off:
             await summer(master_entity, False, ccfg.get(F_HVAC_MODE) or "heat_cool")
             self.control.summer_off.discard(master_entity)
-            await self._store.async_save({"summer_off": sorted(self.control.summer_off)})
+            await self._save()
             self._events.append(f"{ccfg[F_NAME]}: Sommer vorbei – Heizung wieder an")
 
     async def _write_rooms(self, out: dict[str, Any], g: Globals, now: float) -> None:

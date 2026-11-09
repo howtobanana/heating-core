@@ -37,6 +37,7 @@ OPT_NOTIFY_DEVICES = "notify_devices"
 OPT_PUSH_ENABLED = "push_enabled"
 OPT_QUIET_SCHEDULE = "quiet_schedule"
 OPT_EXPERT = "leitstand_expert"
+OPT_ROOM_DEMAND_DELTA = "room_demand_delta"
 
 DEFAULTS = {
     OPT_ECO: 19.0,
@@ -62,6 +63,7 @@ DEFAULTS = {
     OPT_NOTIFY_DEVICES: [],
     OPT_PUSH_ENABLED: True,
     OPT_EXPERT: False,
+    OPT_ROOM_DEMAND_DELTA: 2.0,
 }
 
 # Felder in Heizkreis- und Raum-Subentries
@@ -94,3 +96,9 @@ STARTUP_GUARD_S = 120
 UPDATE_INTERVAL_S = 180
 
 MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing", "circuit_off"]
+
+# Träger Kessel (Ökofen, HEATING-19, Fabian 09.11.2026): möglichst wenige Brennerstarts
+GENTLE_HOLD_S = 2 * 3600  # Mindesthaltezeit je Kreis nach einem Schreibvorgang (außer Ereignis)
+GENTLE_MIN_HYSTERESIS = 1.0  # °C, in beide Richtungen
+GENTLE_SHORT_SETBACK_S = 3 * 3600  # kürzere Absenkphasen im Zeitplan werden übersprungen
+GENTLE_PRE_HEAT_LEAD_S = 3600  # Komfort so viel früher als der Zeitplan beginnen

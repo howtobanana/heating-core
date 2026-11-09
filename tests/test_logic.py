@@ -203,3 +203,14 @@ def test_raum_zeigt_abwesend():
     g = Globals(**{**G.__dict__, "away": True})
     r = room_target(g, room(schedule_on=True))
     assert (r.mode, r.target) == ("away", g.away_temp)
+
+
+def test_raum_hebt_traegen_kreis_erst_ab_differenz():
+    # Perg 09.11.2026: Büro OG (Komfort 24,5) hob HK1 von 22,8 auf 24,5 °C (HEATING-19)
+    m = MasterInput(comfort=22.8, current_temp=23.0, set_now=22.8, schedule_on=True, modulating=True, room_demand_delta=2.0)
+    r_in = RoomInput(comfort=24.5, current_temp=23.1, current_setpoint=24.5, schedule_on=True)
+    r_res = room_target(G, r_in)
+    assert r_res.needs_heat
+    assert master_target(G, m, [(r_in, r_res)]).target == 22.8  # 1,4 °C zu kalt: nur der TRV heizt
+    cold = RoomInput(comfort=24.5, current_temp=22.0, current_setpoint=24.5, schedule_on=True)
+    assert master_target(G, m, [(cold, room_target(G, cold))]).target == 24.5  # 2,5 °C zu kalt: Raum fordert an

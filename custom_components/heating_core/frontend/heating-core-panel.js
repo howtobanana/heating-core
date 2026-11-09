@@ -13,7 +13,7 @@ const DECISIONS = {
   startup: "Startschutz nach Neustart", no_setpoint: "Anlage meldet keinen Sollwert",
   pending_confirmation: "Warte auf Bestätigung der Anlage", no_delta: "Passt – nichts zu tun",
   within_hysteresis: "Abweichung zu klein", budget: "Schreib-Budget erschöpft",
-  hold_drop: "Sperrzeit nach Erhöhen", hold_raise: "Sperrzeit nach Absenken",
+  hold_drop: "Sperrzeit nach Erhöhen", hold_raise: "Sperrzeit nach Absenken", hold_min: "Kessel schonen: Haltezeit 2 h",
   raise: "Würde erhöhen", drop: "Würde absenken", significant_drop: "Würde deutlich absenken",
   forced_min: "Sicherheit: Minimum", renew: "Würde erneuern", circuit_off: "Kreis aus – nicht übersteuert",
 };

@@ -52,6 +52,7 @@ from .const import (
     OPT_BUDGET,
     OPT_DEACTIVATION_MIN,
     OPT_ECO,
+    OPT_ROOM_DEMAND_DELTA,
     OPT_GUEST_ENTITY,
     OPT_HUMIDITY_DROP,
     OPT_HUMIDITY_ENABLED,
@@ -166,6 +167,9 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Required(OPT_EXPERT, default=o[OPT_EXPERT]): bool,
             }
         )
+        if self.config_entry.data.get(CONF_MANUFACTURER) == "oekofen":
+            # träger Kessel: Räume heben den Kreis erst ab dieser Differenz zum Komfort (HEATING-19)
+            schema = schema.extend({vol.Required(OPT_ROOM_DEMAND_DELTA, default=o[OPT_ROOM_DEMAND_DELTA]): _temp(0, 5, 0.5)})
         return self.async_show_form(step_id="init", data_schema=schema)
 
 

@@ -49,7 +49,8 @@
           "push_enabled": "Push to phone",
           "notify_devices": "Phones (mobile app)",
           "quiet_schedule": "Quiet time (schedule, no pushes)",
-          "leitstand_expert": "Expert log (full details of every run as notification)"
+          "leitstand_expert": "Expert log (full details of every run as notification)",
+          "room_demand_delta": "Room requests heat from"
         },
         "description": "Applies to the whole system. Set comfort and setback per circuit or room on its slider or on the Heating page.",
         "data_description": {
@@ -79,7 +80,8 @@
           "push_enabled": "Sends writes and new problems to phones. The problem notification in HA is always on.",
           "notify_devices": "Phones with the Home Assistant app that receive pushes.",
           "quiet_schedule": "While this schedule is on (e.g. at night), no pushes are sent.",
-          "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting."
+          "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting.",
+          "room_demand_delta": "Ökofen only: a room raises the whole circuit only when it is this far below its comfort. Otherwise it heats via its own thermostat and the boiler keeps running calmly. 0 = every room may raise it at once."
         }
       }
     }
@@ -293,6 +295,9 @@
       },
       "deviation": {
         "name": "Deviation from system"
+      },
+      "starts_today": {
+        "name": "Burner starts today"
       }
     },
     "binary_sensor": {

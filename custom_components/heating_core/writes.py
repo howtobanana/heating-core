@@ -29,6 +29,8 @@ class WriteConfig:
     confirm_delay_s: float = 30 * 60  # so lange meldet die Anlage einen Write evtl. noch nicht
     significant_drop: float = 1.5
     budget_limited: bool = True  # False: kein Schreib-Budget (z. B. Ökofen)
+    min_hold_s: float = 0.0  # träger Kessel: so lange nach jedem Write nichts ändern, außer bei Ereignis (HEATING-19)
+    symmetric_hysteresis: bool = False  # Hysterese auch beim Absenken
 
     @property
     def budget(self) -> int:
@@ -86,6 +88,10 @@ def decide(
 
     age = now - last.ts if last else float("inf")
     override = bypass or away or forced_min
+    if last and age < cfg.min_hold_s and not override:
+        return Decision(False, "none", "hold_min")
+    if cfg.symmetric_hysteresis and abs(delta) <= cfg.hysteresis and not override:
+        return Decision(False, "none", "within_hysteresis")
     if kind == "drop":
         if -delta >= cfg.significant_drop:
             return Decision(True, "drop", "significant_drop")

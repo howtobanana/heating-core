@@ -22,6 +22,7 @@ class AdapterLimits:
     confirm_delay_s: float = 30 * 60
     write_budget: bool = True  # Schreib-Budget nur, wo die Anlage es braucht (Vaillant-Cloud-API); Ökofen nicht
     modulating: bool = False  # Anlage regelt selbst über Heizkurve: Sollwert halten, nicht takten
+    gentle: bool = False  # träger Kessel (Ökofen, HEATING-19): Haltezeit, Hysterese ≥ 1 °C, Räume erst ab Differenz, kurze Absenkung überspringen
 
 
 class HeatingAdapter(Protocol):

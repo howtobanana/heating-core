@@ -49,7 +49,8 @@
           "push_enabled": "Push aufs Handy",
           "notify_devices": "Handys (Mobile App)",
           "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)",
-          "leitstand_expert": "Leitstand Expert (alle Details jedes Laufs als HA-Meldung)"
+          "leitstand_expert": "Leitstand Expert (alle Details jedes Laufs als HA-Meldung)",
+          "room_demand_delta": "Raum fordert Wärme ab"
         },
         "description": "Gilt für die ganze Anlage. Komfort und Absenkung stellst du je Heizkreis bzw. Raum am Regler oder auf der Seite „Heizung“ ein.",
         "data_description": {
@@ -79,7 +80,8 @@
           "push_enabled": "Schickt Schreibvorgänge und neue Probleme aufs Handy. Die Problem-Meldung in HA gibt es immer.",
           "notify_devices": "Handys mit der Home-Assistant-App, die Push-Nachrichten bekommen.",
           "quiet_schedule": "Solange dieser Zeitplan an ist (z. B. nachts), werden keine Push-Nachrichten verschickt.",
-          "leitstand_expert": "Zeigt nach jedem Lauf alle Details (Soll, Ist, Entscheidung, Budget je Kreis und Raum) als HA-Meldung. Zur Fehlersuche, sonst aus."
+          "leitstand_expert": "Zeigt nach jedem Lauf alle Details (Soll, Ist, Entscheidung, Budget je Kreis und Raum) als HA-Meldung. Zur Fehlersuche, sonst aus.",
+          "room_demand_delta": "Nur Ökofen: Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt. Sonst heizt er nur über sein Thermostat, und der Kessel läuft ruhig weiter. 0 = jeder Raum darf sofort anheben."
         }
       }
     }
@@ -293,6 +295,9 @@
       },
       "deviation": {
         "name": "Abweichung zur Anlage"
+      },
+      "starts_today": {
+        "name": "Brennerstarts heute"
       }
     },
     "binary_sensor": {

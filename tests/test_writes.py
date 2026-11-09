@@ -101,3 +101,25 @@ def test_ohne_budget_bei_oekofen():
     d = decide(now=1100, target=17.0, set_now=20.0, writes=writes, cfg=cfg)
     assert d.write and d.reason != "budget"
     assert decide(now=1100, target=17.0, set_now=20.0, writes=writes, cfg=WriteConfig()).reason == "budget"
+
+
+# Träger Kessel (Ökofen, HEATING-19): Haltezeit 2 h, Hysterese in beide Richtungen
+GENTLE = WriteConfig(hysteresis=1.0, budget_limited=False, min_hold_s=7200, symmetric_hysteresis=True)
+
+
+def test_traeger_kessel_haelt_zwei_stunden():
+    last = [Write(NOW - 3600, 21.0, "raise")]
+    assert d(cfg=GENTLE, target=17.0, set_now=21.0, writes=last).reason == "hold_min"
+    assert d(cfg=GENTLE, target=17.0, set_now=21.0, writes=[Write(NOW - 7300, 21.0, "raise")]).write
+
+
+def test_traeger_kessel_ereignis_hebt_haltezeit_auf():
+    last = [Write(NOW - 600, 21.0, "raise")]
+    assert d(cfg=GENTLE, target=16.0, set_now=21.0, writes=last, bypass=True).write
+    assert d(cfg=GENTLE, target=16.0, set_now=21.0, writes=last, away=True).write
+
+
+def test_traeger_kessel_hysterese_auch_beim_absenken():
+    assert d(cfg=GENTLE, target=20.2, set_now=21.0).reason == "within_hysteresis"
+    assert d(cfg=GENTLE, target=21.8, set_now=21.0).reason == "within_hysteresis"
+    assert d(cfg=GENTLE, target=19.5, set_now=21.0).write

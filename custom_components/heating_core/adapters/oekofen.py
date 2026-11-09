@@ -61,6 +61,11 @@ class OekofenAdapter:
         base = f"sensor.{prefix}_pellematic_1_l_storage"
         return self._num(f"{base}_fill"), self._num(f"{base}_max")
 
+    def starts(self, master_entity: str) -> float | None:
+        """Brennerstarts gesamt: climate.pellematic_heating_circuit_1_climate -> sensor.pellematic_pellematic_1_l_starts"""
+        prefix = circuit_base(master_entity).split("_heating_circuit")[0]
+        return self._num(f"sensor.{prefix}_pellematic_1_l_starts")
+
     def _ids(self, master_entity: str) -> dict[str, str]:
         b = circuit_base(master_entity)
         return {"mode": f"select.{b}_mode_auto", "heat": f"number.{b}_temp_heat", "setback": f"number.{b}_temp_setback",
@@ -117,6 +122,7 @@ class OekofenAdapter:
             max_temp=_float(attrs.get("max_temp")) or 35.0,
             confirm_delay_s=10 * 60,
             modulating=True,
+            gentle=True,
             write_budget=False,  # lokale Pellematic-Schnittstelle, kein API-Limit (Fabian, 09.11.2026)  # Pellematic-Heizkurve mit Raumeinfluss regelt, Heating Core hält den Sollwert
         )
 

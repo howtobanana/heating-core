@@ -14,7 +14,7 @@ from .entity import HeatingEntity
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
     if entry.data.get("manufacturer") == "oekofen":
-        async_add_entities([Fuel(coordinator)])
+        async_add_entities([Fuel(coordinator), StartsToday(coordinator)])
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT:
             async_add_entities([CircuitTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, True),
@@ -137,6 +137,20 @@ class Fuel(HeatingEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         return {"max_kg": (self.coordinator.data or {}).get("fuel_max_kg")}
+
+
+class StartsToday(HeatingEntity, SensorEntity):
+    """Brennerstarts seit Mitternacht (Ökofen): zeigt, ob Heating Core den Kessel schont (HEATING-19)."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_translation_key = "starts_today"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "starts_today")
+
+    @property
+    def native_value(self):
+        return (self.coordinator.data or {}).get("starts_today")
 
 
 class Deviation(HeatingEntity, SensorEntity):

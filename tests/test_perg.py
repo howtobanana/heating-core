@@ -264,3 +264,27 @@ async def test_falsche_betriebsart_auch_in_hysterese(hass: HomeAssistant) -> Non
     assert coordinator.data["circuits"]["hk1"]["would_write"] is False  # ohne Betriebsart-Prüfung bliebe es so
     assert [c.data["option"] for c in sel] == ["2_heizen"]
     assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-3.0]
+
+
+async def test_traeger_kessel_kurze_absenkung_und_starts(hass: HomeAssistant) -> None:
+    """HEATING-19: Absenkphase unter 3 h überspringen, 1 h früher Komfort, Brennerstarts seit Mitternacht."""
+    from datetime import timedelta
+    from homeassistant.util import dt as dt_util
+
+    _hk1_states(hass, mode="2_heizen")
+    hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})
+    hass.states.async_set("sensor.pellematic_pellematic_1_l_starts", "5130")
+    in_2h = (dt_util.now() + timedelta(hours=2)).isoformat()
+    hass.states.async_set("schedule.hk1", "off", {"next_event": in_2h})
+    coordinator = await _setup(hass, _hk1_entry(schedule="schedule.hk1"))
+    coordinator.control.setback["hk1"] = 18.0
+    await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["target"] == 22.0  # 2-h-Lücke: bleibt auf Komfort
+    in_5h = (dt_util.now() + timedelta(hours=5)).isoformat()
+    hass.states.async_set("schedule.hk1", "off", {"next_event": in_5h})
+    await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["target"] == 18.0  # lange Absenkung bleibt
+    assert coordinator.data["starts_today"] == 0
+    hass.states.async_set("sensor.pellematic_pellematic_1_l_starts", "5132")
+    await coordinator.async_refresh()
+    assert coordinator.data["starts_today"] == 2

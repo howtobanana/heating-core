@@ -160,6 +160,8 @@ class MasterInput:
     humidity_drop: float = 0.5
     # Anlage mit eigener Heizkurve (Ökofen): Sollwert halten statt Zweipunkt, auf 0,1 K genau
     modulating: bool = False
+    # Räume heben den Kreis nur, wenn sie so weit unter ihrem Komfort liegen (0 = immer, HEATING-19)
+    room_demand_delta: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -210,7 +212,8 @@ def master_target(
     target_final = g.min_trv if forced_min else target_temp
     floor = g.min_trv if away else g.eco
 
-    room_demands = [res.target for _, res in rooms if res.active and res.needs_heat]
+    room_demands = [res.target for r, res in rooms if res.active and res.needs_heat
+                    and (m.room_demand_delta <= 0 or r.comfort - r.current_temp >= m.room_demand_delta)]
     if forced_min:
         base_required = floor
     elif away or (m.presence_priority and presence) or not room_demands:
