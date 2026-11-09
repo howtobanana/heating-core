@@ -2,9 +2,11 @@
 
 Variante B (Fabian, 08.11.2026): Heating Core macht den Tagesablauf, die Pellematic rechnet
 immer mit ihrer eigenen Heizkurve. Geschrieben werden nur Betriebsart und Offset:
-- Ziel nahe Heiztemperatur → `select.<kreis>_mode_auto` = heizen, Basis `number.<kreis>_temp_heat`
-- Ziel nahe Absenktemperatur → absenken, Basis `number.<kreis>_temp_setback`
-- Feinabstimmung über `number.<kreis>_remote_override` (±3 K)
+- Ziel über der Absenktemperatur → `select.<kreis>_mode_auto` = heizen, Basis `number.<kreis>_temp_heat`
+- Ziel auf/unter der Absenktemperatur → absenken, Basis `number.<kreis>_temp_setback`
+- Feinabstimmung über `number.<kreis>_remote_override` (±3 K, nur ganze Kelvin)
+Absenken nie für ein höheres Ziel: Die Pellematic hat im Absenkbetrieb eine eigene Heizgrenze und
+schaltet den Kreis dann ab, statt die Absenktemperatur plus Offset zu halten (HEATING-18).
 Heiz- und Absenktemperatur der Pellematic bleiben unangetastet. „Schreiben aus“ gibt den Kreis
 zurück (auto, Offset 0): dann gilt wieder das eigene Zeitprogramm der Pellematic.
 
@@ -12,6 +14,8 @@ zurück (auto, Offset 0): dann gilt wieder das eigene Zeitprogramm der Pellemati
 """
 
 from __future__ import annotations
+
+import math
 
 from homeassistant.core import HomeAssistant
 
@@ -31,13 +35,16 @@ MODE_AUTO, MODE_HEAT, MODE_SETBACK = "1_auto", "2_heizen", "3_absenken"
 
 
 def offset_for(target: float, base: float) -> float:
-    """Offset auf die Basis (Heiz- oder Absenktemperatur), auf 0,1 K, begrenzt auf ±3 K."""
-    return round(max(-MAX_OFFSET_K, min(MAX_OFFSET_K, target - base)), 1)
+    """Offset auf die Basis (Heiz- oder Absenktemperatur), begrenzt auf ±3 K.
+
+    Ganze Kelvin: Die Pellematic schneidet Nachkommastellen ab (Perg 09.11.2026: 1,7 → 1, 0,7 → 0),
+    sonst schreibt Heating Core alle 10 Minuten erneut (HEATING-18)."""
+    return float(math.floor(max(-MAX_OFFSET_K, min(MAX_OFFSET_K, target - base)) + 0.5))
 
 
 def choose_mode(target: float, heat: float, setback: float) -> str:
-    """Heizen oder Absenken – je nachdem, welcher Pellematic-Wert näher am Ziel liegt."""
-    return MODE_HEAT if abs(target - heat) <= abs(target - setback) else MODE_SETBACK
+    """Absenken nur, wenn das Ziel die Absenktemperatur nicht übersteigt, sonst Heizen (HEATING-18)."""
+    return MODE_SETBACK if target <= setback + 0.5 and target < heat else MODE_HEAT
 
 
 class OekofenAdapter:

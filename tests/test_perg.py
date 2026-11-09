@@ -22,10 +22,18 @@ def test_kreis_basis():
 
 def test_offset_rechnung():
     # Basis ist die Heiz- bzw. Absenktemperatur der Pellematic, nie l_roomtemp_set (HEATING-13)
-    assert offset_for(22.0, 22.8) == -0.8
+    assert offset_for(22.0, 22.8) == -1.0  # ganze Kelvin, die Pellematic schneidet ab (HEATING-18)
+    assert offset_for(24.5, 22.8) == 2.0
     assert offset_for(30.0, 20.0) == 3.0  # begrenzt auf ±3 K
     assert choose_mode(22.0, 22.8, 20.0) == "2_heizen"
     assert choose_mode(15.5, 20.0, 15.5) == "3_absenken"
+    assert choose_mode(16.0, 20.0, 15.5) == "3_absenken"
+
+
+def test_komfort_nie_ueber_absenken():
+    # Perg UG 09.11.2026: Komfort 17 °C wurde zu „absenken“ 15,5 + 1 K -> Kreis über Heizgrenze aus (HEATING-18)
+    assert choose_mode(17.0, 20.0, 15.5) == "2_heizen"
+    assert offset_for(17.0, 20.0) == -3.0
 
 
 def _entry() -> MockConfigEntry:
@@ -230,4 +238,4 @@ async def test_eigene_absenkung_sperrt_rueckweg_nicht(hass: HomeAssistant) -> No
         await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["decision"] != "circuit_off"
     assert [c.data["option"] for c in sel] == ["2_heizen"]
-    assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-0.8]  # 22,0 − 22,8
+    assert [c.data["value"] for c in num if c.data["entity_id"].endswith("remote_override")] == [-1.0]  # 22,0 − 22,8, auf ganze Kelvin
