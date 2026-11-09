@@ -301,14 +301,10 @@ class HeatingCorePanel extends HTMLElement {
     const budget = info.find((i) => has(i.t.schreib_budget_rest));
     const writes = budget ? `${budget.t.schreib_budget_rest}/${budget.t.schreib_budget}` : null;
     const big = has(kessel) ? fmt(kessel, 0) + " °C" : writes || "–";
-    // Brenner (Ökofen, HEATING-24): brennt, solange er moduliert; Box und Text zeigen es
+    // Brenner (Ökofen, HEATING-24): solange er moduliert, glüht die Umrandung (Fabian: kein Wort, kein Emoji)
     const k = fuel?.attributes?.kessel;
     const burning = has(k?.modulation) ? Number(k.modulation) > 0 : null;
-    // zwei kurze Zeilen, die Box ist schmal: Zustand, darunter Leistung
-    const burner = burning === null ? [] : burning ? (narrow ? [`🔥 ${fmt(k.modulation, 0)} %`] : [`🔥 ${esc(k.burner_text || "Brenner an")}`, `${fmt(k.modulation, 0)} % Leistung`])
-      : ["Brenner aus", k.burner_text && k.burner_text !== "Aus" ? esc(k.burner_text) : ""];
-    s = `<rect class="box boiler ${burning === false ? "cold" : ""}" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"/>${tank}
-      ${burner.filter(Boolean).map((t, i) => `<text class="s mid ${burning ? "burn" : ""}" x="${cx}" y="${cyB + 56 + i * 18}">${t}</text>`).join("")}
+    s = `<rect class="box boiler ${burning === false ? "cold" : burning ? "burn" : ""}" x="${boiler.x}" y="${boiler.y}" width="${boiler.w}" height="${boiler.h}" rx="14"><title>${burning ? `Brenner an · ${fmt(k.modulation, 0)} %` : burning === false ? "Brenner aus" : ""}</title></rect>${tank}
       <text class="s mid" x="${cx}" y="${cyB - 24}">${title}</text>
       <text class="big mid" x="${cx}" y="${cyB + 4}">${big}</text>
       ${!has(kessel) && writes ? `<text class="s mid" x="${cx}" y="${cyB + 24}">${narrow ? "Writes" : "Writes frei / h"}</text>` : ""}
@@ -333,6 +329,7 @@ class HeatingCorePanel extends HTMLElement {
 
   _legend() {
     return `<div class="legend">
+      <span><i class="burnkey"></i>Brenner an</span>
       <span><i class="ln" style="background:${HOT}"></i>Vorlauf warm</span>
       <span><i class="ln" style="background:${COLD}"></i>Rücklauf</span>
       <span><i class="ln" style="background:${IDLE}"></i>steht</span>
@@ -681,7 +678,9 @@ const CSS = `
   .schema .lvl { fill: ${HOT}; opacity: .16; }
   .schema .pel.sm { font-size: 13px; } .schema .pel { font-size: 15px; font-weight: 600; fill: var(--primary-text-color); } .schema .pel.lv-ok { fill: #43a047; } .schema .pel.lv-mid { fill: ${WARN}; } .schema .pel.lv-low { fill: #e53935; }
   .schema .boiler { fill: ${HOT}12; stroke: ${HOT}66; } .schema .boiler.cold { fill: ${IDLE}12; stroke: ${IDLE}66; }
-  .schema .s.burn { fill: ${HOT}; font-weight: 600; }
+  .schema .boiler.burn { stroke: ${HOT}; stroke-width: 3; animation: glow 2.4s ease-in-out infinite; }
+  @keyframes glow { 0%, 100% { filter: drop-shadow(0 0 2px ${HOT}66); } 50% { filter: drop-shadow(0 0 12px ${HOT}); } }
+  @media (prefers-reduced-motion: reduce) { .schema .boiler.burn { animation: none; filter: drop-shadow(0 0 8px ${HOT}); } }
   .schema text { text-anchor: start; } .schema .mid { text-anchor: middle; } .schema .end { text-anchor: end; }
   .schema .t { font-size: 14px; font-weight: 600; fill: var(--primary-text-color); } .schema .t.sm { font-size: 13px; }
   .schema .s { font-size: 12px; fill: var(--secondary-text-color); }
@@ -700,6 +699,7 @@ const CSS = `
   .kessel { display:flex; flex-wrap:wrap; align-items:center; gap: 6px 18px; margin-top: 10px; font-size: 13px; color: var(--secondary-text-color); }
   .kessel b { color: var(--primary-text-color); } .kessel .chip { margin-top: 0; }
   .legend { display:flex; flex-wrap:wrap; gap: 6px 16px; margin-top: 12px; font-size: 12px; color: var(--secondary-text-color); align-items:center; }
+  .legend .burnkey { width: 14px; height: 18px; border: 2px solid ${HOT}; border-radius: 4px; box-shadow: 0 0 6px ${HOT}; display:inline-block; box-sizing: border-box; }
   .legend span { display:inline-flex; align-items:center; gap: 6px; } .legend .ln { width: 22px; height: 5px; border-radius: 3px; display:inline-block; }
 
   .group { margin: 20px 0; }
