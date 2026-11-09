@@ -81,6 +81,8 @@ from .floor import Zone, plan as floor_plan
 from .logic import Globals, MasterInput, RoomInput, follower_target, master_target, room_base, room_target
 from .timing import Reading, presence, window
 from .writes import Decision, Write, WriteConfig, decide
+from . import trv as trv_tools
+from homeassistant.helpers import entity_registry as er
 
 _LOGGER = logging.getLogger(__name__)
 TRV_READBACK_S = 5 * 60
@@ -114,6 +116,7 @@ class ControlState:
     comfort: dict[str, float] = field(default_factory=dict)  # Regler „Komfort“ je Kreis/Raum
     setback: dict[str, float] = field(default_factory=dict)  # Regler „Absenkung“ je Kreis/Raum
     trv_writes: dict[str, tuple[float, float]] = field(default_factory=dict)
+    trv_tuned: dict[str, float] = field(default_factory=dict)  # TRV -> Zeit des letzten Abgleichs (HEATING-16)
     summer_off: set[str] = field(default_factory=set)  # Master, die Heating Core wegen Sommer ausgeschaltet hat  # TRV -> (Zeit, geschriebener Sollwert)
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
@@ -328,7 +331,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             isolated.append((r_in, r_res))
             out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": r_res.mode, "target": r_res.target, "entity": rcfg[F_CLIMATE],
                                  "setpoint": r_in.current_setpoint, "presence": r_in.presence_on, "current": r_in.current_temp,
-                                 "heat_demand": r_res.needs_heat}
+                                 "heat_demand": r_res.needs_heat, "sensor": rcfg.get(F_TEMP)}
             # Rücklesen: 5 min nach dem Schreiben muss der TRV den Sollwert zeigen (Blueprint „TRV Write Failed“)
             sent = self.control.trv_writes.get(rcfg[F_CLIMATE])
             if sent and now - sent[0] >= TRV_READBACK_S:
@@ -488,8 +491,13 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not self.control.write_enabled or now - self._started < STARTUP_GUARD_S:
             return
         for room in out["rooms"].values():
+            if room.get("entity") is None:
+                continue
+            await self._tune_trv(room, now)
             tgt, cur = room.get("target"), room.get("setpoint")
-            if tgt is None or room.get("entity") is None or (cur is not None and abs(tgt - cur) <= g.hysteresis):
+            if tgt is not None:  # auf die Schrittweite des TRV (Moes: ganze Grad), sonst schreibt er jedes Mal neu
+                tgt = trv_tools.step_round(tgt, self._attr(room["entity"], "target_temp_step"))
+            if tgt is None or (cur is not None and abs(tgt - cur) <= g.hysteresis):
                 continue
             try:
                 await self.hass.services.async_call(
@@ -499,6 +507,52 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except (HomeAssistantError, ValueError) as err:
                 _LOGGER.warning("Thermostat %s: Sollwert %s nicht geschrieben: %s", room["entity"], tgt, err)
                 room["problem"] = "room_write_failed"
+
+    def _companions(self, climate: str) -> list[str]:
+        """Alle Entitäten am selben Gerät wie der TRV (Kalibrierung, externer Fühler, Eco-Schalter)."""
+        reg = er.async_get(self.hass)
+        ent = reg.async_get(climate)
+        if ent is None or ent.device_id is None:
+            return []
+        return [e.entity_id for e in er.async_entries_for_device(reg, ent.device_id)]
+
+    async def _tune_trv(self, room: dict, now: float) -> None:
+        """TRV gehorchen lassen und mit dem Raumfühler abgleichen (HEATING-16)."""
+        climate = room["entity"]
+        st = self.hass.states.get(climate)
+        if st is None or st.state in ("unavailable", "unknown"):
+            return
+        others = self._companions(climate)
+        try:
+            eco = trv_tools.pick(others, trv_tools.ECO_SUFFIXES)
+            if eco and self._on(eco):
+                await self.hass.services.async_call("switch", "turn_off", {"entity_id": eco}, blocking=True)
+            presets = st.attributes.get("preset_modes") or []
+            if "manual" in presets and st.attributes.get("preset_mode") not in ("manual", None):
+                await self.hass.services.async_call("climate", "set_preset_mode", {"entity_id": climate, "preset_mode": "manual"}, blocking=True)
+            sensor = self._num(room.get("sensor"))
+            if sensor is None:
+                return  # ohne Raumfühler bleibt die Kalibrierung, wie sie am TRV steht
+            ext = trv_tools.pick(others, trv_tools.EXT_SUFFIXES)
+            last = self.control.trv_tuned.get(climate, 0.0)
+            if ext:
+                old = self._num(ext)
+                if now - last >= trv_tools.EXT_INTERVAL_S and (old is None or abs(old - sensor) > trv_tools.EXT_THRESHOLD):
+                    await self.hass.services.async_call("number", "set_value", {"entity_id": ext, "value": round(sensor, 1)}, blocking=True)
+                    self.control.trv_tuned[climate] = now
+                return
+            cal = trv_tools.pick(others, trv_tools.CAL_SUFFIXES)
+            shown, cal_now = _float(st.attributes.get("current_temperature")), self._num(cal)
+            if not cal or shown is None or cal_now is None or now - last < trv_tools.CAL_INTERVAL_S:
+                return
+            a = self.hass.states.get(cal).attributes
+            new = trv_tools.new_calibration(sensor, shown, cal_now, float(a.get("min", -9)), float(a.get("max", 9)), float(a.get("step", 1)))
+            if new is not None:
+                await self.hass.services.async_call("number", "set_value", {"entity_id": cal, "value": new}, blocking=True)
+                self.control.trv_tuned[climate] = now
+                _LOGGER.info("%s: Thermostat abgeglichen, Kalibrierung %+.0f → %+.0f °C", room.get("name"), cal_now, new)
+        except (HomeAssistantError, ValueError) as err:
+            _LOGGER.warning("Thermostat %s: Abgleich fehlgeschlagen: %s", climate, err)
 
     async def _floor_circuit(self, cid: str, ccfg: dict, g: Globals, now: float) -> dict[str, Any]:
         """Fußboden mit eigener Pumpe und Ventil-Kanälen (Sonderfall Perg)."""
