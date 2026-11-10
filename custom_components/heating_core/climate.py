@@ -29,7 +29,6 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
 
 class Thermostat(HeatingEntity, ClimateEntity):
     _attr_name = None  # Hauptentität des Geräts: climate.<raum>
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_hvac_modes = [HVACMode.HEAT]
     _attr_hvac_mode = HVACMode.HEAT
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
@@ -50,13 +49,34 @@ class Thermostat(HeatingEntity, ClimateEntity):
                 return c["rooms"][self._sid]
         return {}
 
-    @property
-    def current_temperature(self) -> float | None:
+    def _current(self) -> float | None:
         return self._data().get("current")
 
-    @property
-    def target_temperature(self) -> float:
+    def _target(self) -> float:
         return self.coordinator.control.comfort.get(self._sid, self._default)
+
+    # Neuere HA-Versionen wollen native_* und warnen bei den alten Namen (fallen mit 2027.11 weg, HEATING-22);
+    # HA 2026.10 kennt native_* noch nicht – daher je nach Version (shortcut: Zweig entfernen, sobald HA ≥ native-Version Pflicht ist)
+    if hasattr(ClimateEntity, "native_current_temperature"):
+        _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+
+        @property
+        def native_current_temperature(self) -> float | None:
+            return self._current()
+
+        @property
+        def native_target_temperature(self) -> float:
+            return self._target()
+    else:
+        _attr_temperature_unit = UnitOfTemperature.CELSIUS
+
+        @property
+        def current_temperature(self) -> float | None:
+            return self._current()
+
+        @property
+        def target_temperature(self) -> float:
+            return self._target()
 
     @property
     def hvac_action(self) -> HVACAction:
