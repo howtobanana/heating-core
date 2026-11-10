@@ -101,6 +101,7 @@ class Thermostat(HeatingEntity, ClimateEntity):
             return
         self.coordinator.control.comfort[self._sid] = float(value)
         self.async_write_ha_state()
+        self.coordinator.user_input()
         await self.coordinator.async_request_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:

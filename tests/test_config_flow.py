@@ -54,6 +54,7 @@ async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == "form"
     defaults = {k.schema: k.default() for k in result["data_schema"].schema if callable(getattr(k, "default", None))}
+    assert "weather_enabled" not in defaults and "weather_zone1" not in defaults  # Ökofen: Heizkurve kompensiert selbst
     result = await hass.config_entries.options.async_configure(result["flow_id"], {**defaults, "boost_enabled": False})
     assert result["type"] == "create_entry"
     assert entry.options["boost_enabled"] is False

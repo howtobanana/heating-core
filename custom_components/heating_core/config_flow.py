@@ -37,6 +37,7 @@ from .const import (
     F_KIND,
     F_MASTER,
     F_OFFSET,
+    F_PRE_HEAT_ENTITY,
     F_PRESENCE,
     F_ROLE,
     F_SCHEDULE,
@@ -156,10 +157,6 @@ class HeatingOptionsFlow(OptionsFlow):
                 _opt(OPT_SUMMER_MEAN_SENSOR, o): _entity("sensor"),
                 vol.Required(OPT_SUMMER_LIMIT, default=o[OPT_SUMMER_LIMIT]): _temp(10, 22),
                 _opt(OPT_OUTDOOR_SENSOR, o): _entity("sensor", device_class="temperature"),
-                vol.Required(OPT_WEATHER_ENABLED, default=o[OPT_WEATHER_ENABLED]): bool,
-                vol.Required(OPT_WEATHER_ZONE1, default=o[OPT_WEATHER_ZONE1]): _temp(0, 5),
-                vol.Required(OPT_WEATHER_ZONE2, default=o[OPT_WEATHER_ZONE2]): _temp(0, 5),
-                vol.Required(OPT_WEATHER_ZONE3, default=o[OPT_WEATHER_ZONE3]): _temp(0, 5),
                 vol.Required(OPT_BOOST_ENABLED, default=o[OPT_BOOST_ENABLED]): bool,
                 vol.Required(OPT_BOOST_AMOUNT, default=o[OPT_BOOST_AMOUNT]): _temp(0.5, 3),
                 vol.Required(OPT_BOOST_THRESHOLD, default=o[OPT_BOOST_THRESHOLD]): _temp(0.5, 3),
@@ -174,6 +171,14 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Required(OPT_EXPERT, default=o[OPT_EXPERT]): bool,
             }
         )
+        if self.config_entry.data.get(CONF_MANUFACTURER) != "oekofen":
+            # Gebäude-Kompensation nur ohne eigene Heizkurve; bei Ökofen kompensiert die Pellematic selbst (HEATING-21)
+            schema = schema.extend({
+                vol.Required(OPT_WEATHER_ENABLED, default=o[OPT_WEATHER_ENABLED]): bool,
+                vol.Required(OPT_WEATHER_ZONE1, default=o[OPT_WEATHER_ZONE1]): _temp(0, 5),
+                vol.Required(OPT_WEATHER_ZONE2, default=o[OPT_WEATHER_ZONE2]): _temp(0, 5),
+                vol.Required(OPT_WEATHER_ZONE3, default=o[OPT_WEATHER_ZONE3]): _temp(0, 5),
+            })
         if self.config_entry.data.get(CONF_MANUFACTURER) == "oekofen":
             # träger Kessel: Räume heben den Kreis erst ab dieser Differenz zum Komfort (HEATING-19)
             schema = schema.extend({
@@ -189,6 +194,7 @@ def _common(d: dict, schedule: bool = True, window: bool = True, temp: bool = Tr
     if schedule:
         out[_opt(F_PRESENCE, d)] = _entity(["binary_sensor", "input_boolean"], multiple=True)  # Geofencing Wien: input_boolean.presence_* (HEATING-33)
         out[_opt(F_SCHEDULE, d)] = _entity("schedule")
+        out[_opt(F_PRE_HEAT_ENTITY, d)] = _entity("input_boolean")  # optional, z. B. Geofencing
     if window:
         out[_opt(F_WINDOW, d)] = _entity("binary_sensor")
     if temp:

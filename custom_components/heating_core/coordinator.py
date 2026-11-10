@@ -39,6 +39,7 @@ from .const import (
     F_MASTER,
     F_NAME,
     F_OFFSET,
+    F_PRE_HEAT_ENTITY,
     F_PRESENCE,
     F_ROLE,
     F_SCHEDULE,
@@ -72,6 +73,7 @@ from .const import (
     OPT_WINDOW_DELAY_S,
     OPT_WINDOW_SETTLE_S,
     STARTUP_GUARD_S,
+    USER_SETTLE_S,
     GENTLE_HOLD_S,
     GENTLE_MIN_HYSTERESIS,
     GENTLE_SHORT_SETBACK_S,
@@ -124,6 +126,8 @@ class ControlState:
     summer_off: set[str] = field(default_factory=set)  # Master, die Heating Core wegen Sommer ausgeschaltet hat  # TRV -> (Zeit, geschriebener Sollwert)
     eco: float | None = None  # Regler „Eco“ der Anlage
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
+    presence_on_min: float | None = None  # Regler „Präsenz an nach“ (min), sonst Optionen
+    presence_off_min: float | None = None  # Regler „Präsenz aus nach“ (min), sonst Optionen
     write_events: dict[str, tuple] = field(default_factory=dict)  # Kreis -> Ereignislage beim letzten Write (HEATING-19)
 
 
@@ -142,6 +146,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.control = ControlState()
         self.adapter = get_adapter(hass, entry.data.get(CONF_MANUFACTURER, ""))
         self._started = time.time()
+        self.user_input_at = 0.0  # letzte Eingabe an Reglern/Thermostaten (Entprellung)
         self.notifier = Notifier(hass, entry)
         self._store = Store(hass, 1, f"heating_core.{entry.entry_id}")  # überlebt Neustarts: wer wegen Sommer aus ist
         self._events: list[str] = []
@@ -173,7 +178,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.opt(key):
                 ids.add(self.opt(key))
         for cfg in [*self.circuits().values(), *(s.data for s in self.entry.subentries.values() if s.subentry_type == SUB_ROOM)]:
-            for key in (F_MASTER, F_CLIMATE, F_COMFORT_ENTITY, F_SCHEDULE, F_WINDOW, F_TEMP, F_HUMIDITY, F_PUMP, F_SOURCE_TEMP):
+            for key in (F_MASTER, F_CLIMATE, F_COMFORT_ENTITY, F_SCHEDULE, F_WINDOW, F_TEMP, F_HUMIDITY, F_PUMP, F_SOURCE_TEMP, F_PRE_HEAT_ENTITY):
                 if cfg.get(key):
                     ids.add(cfg[key])
             ids.update(cfg.get(F_PRESENCE) or [])
@@ -198,6 +203,15 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # ---- Zustände lesen ----------------------------------------------------
 
+    def user_input(self) -> None:
+        """Regler/Thermostat geändert: sofort rechnen und anzeigen, aber erst nach 30 s Ruhe schreiben."""
+        self.user_input_at = time.time()
+
+    def _settled(self, now: float) -> bool:
+        """Darf geschrieben werden? Startschutz vorbei und 30 s keine Eingabe mehr – mehrere Klicks am Regler
+        ergeben einen Schreibvorgang statt vieler (Entprellung wie im Vaillant-Blueprint, schont Budget und Haltezeiten)."""
+        return now - self._started >= STARTUP_GUARD_S and now - self.user_input_at >= USER_SETTLE_S
+
     def _on(self, entity_id: str | None) -> bool:
         return bool(entity_id) and self.hass.states.is_state(entity_id, "on")
 
@@ -217,13 +231,18 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return Reading("unavailable", 0.0)
         return Reading(st.state, st.last_changed.timestamp())
 
+    def presence_delay(self, opt: str) -> float:
+        """Präsenz-Verzögerung in Minuten: Regler auf der Seite/im Dashboard > Optionen der Anlage."""
+        value = self.control.presence_on_min if opt == OPT_ACTIVATION_MIN else self.control.presence_off_min
+        return float(self.opt(opt)) if value is None else value
+
     def _presence(self, key: str, sensors: list[str], now: float) -> bool:
         prev = self.control.presence.get(key, False)
         cur = presence(
             [self._reading(s) for s in sensors],
             now=now,
-            activation_s=float(self.opt(OPT_ACTIVATION_MIN)) * 60,
-            deactivation_s=float(self.opt(OPT_DEACTIVATION_MIN)) * 60,
+            activation_s=self.presence_delay(OPT_ACTIVATION_MIN) * 60,
+            deactivation_s=self.presence_delay(OPT_DEACTIVATION_MIN) * 60,
             previous=prev,
         )
         self.control.presence[key] = cur
@@ -237,8 +256,17 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             settle_s=float(self.opt(OPT_WINDOW_SETTLE_S)),
         )
 
-    def _pre_heat(self, sid: str, now: float, took_over: bool) -> bool:
-        """Vorheizen ist aktiv bis Präsenz/Zeitplan übernimmt oder das Zeitlimit abläuft."""
+    def _pre_heat(self, sid: str, now: float, took_over: bool, helper: str | None = None) -> bool:
+        """Vorheizen ist aktiv bis Präsenz/Zeitplan übernimmt oder das Zeitlimit abläuft.
+        Optionaler Helfer (z. B. vom Geofencing): an = vorheizen; wie im Blueprint schaltet Heating Core ihn
+        nach Zeitlimit bzw. sobald Präsenz/Zeitplan übernimmt wieder aus – nur bei aktivem Schreiben."""
+        if helper and self._on(helper):
+            since = self.hass.states.get(helper).last_changed.timestamp()
+            if not took_over and now - since < float(self.opt(OPT_PRE_HEAT_TIMEOUT_MIN)) * 60:
+                return True
+            if self.control.write_enabled:
+                self.hass.async_create_task(
+                    self.hass.services.async_call("input_boolean", "turn_off", {"entity_id": helper}, blocking=True))
         start = self.control.pre_heat.get(sid)
         if start is None:
             return False
@@ -376,7 +404,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             set_now=state.setpoint or 0.0,
             schedule_on=m_schedule,
             presence_on=m_presence,
-            pre_heat_on=self._pre_heat(cid, now, m_presence or m_schedule),
+            pre_heat_on=self._pre_heat(cid, now, m_presence or m_schedule, ccfg.get(F_PRE_HEAT_ENTITY)),
             has_demand_source=bool(ccfg.get(F_SCHEDULE) or ccfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             any_window_open=any_window,
@@ -432,7 +460,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             forced_min=m_res.forced_min,
             away=g.away_effective,
             renew_due=state.renew_due,
-            startup_done=now - self._started >= STARTUP_GUARD_S,
+            startup_done=self._settled(now),
         )
         if state.heating_off and not m_res.forced_min:
             # Kreis von der Anlage selbst abgeschaltet: nicht übersteuern.
@@ -446,7 +474,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Variante B: läuft die Anlage noch im eigenen Zeitprogramm, einmal übernehmen
         takeover = getattr(self.adapter, "needs_takeover", None)
         takeover = (bool(takeover and takeover(master_entity, m_res.target)) and not state.heating_off and not held
-                    and now - self._started >= STARTUP_GUARD_S)
+                    and self._settled(now))
         if (dec.write or takeover) and self.control.write_enabled:
             await self.adapter.write_setpoint(master_entity, m_res.target)
             self._events.append(f"{ccfg[F_NAME]}: {_de(state.setpoint)} → {_de(m_res.target)} °C ({MODE_TEXT.get(out['mode'], out['mode'])})")
@@ -524,7 +552,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _write_rooms(self, out: dict[str, Any], g: Globals, now: float) -> None:
         """TRV-Sollwerte schreiben; ein Fehler bei einem Raum stoppt die anderen nicht."""
-        if not self.control.write_enabled or now - self._started < STARTUP_GUARD_S:
+        if not self.control.write_enabled or not self._settled(now):
             return
         for room in out["rooms"].values():
             if room.get("entity") is None:
@@ -635,7 +663,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             target, _active = room_base(replace(g, eco=self.setback(rid, g.eco)), RoomInput(
                 comfort=self._comfort(rcfg, rid), current_temp=temp or 0.0, current_setpoint=0.0,
                 schedule_on=schedule_on, presence_on=presence_on,
-                pre_heat_on=self._pre_heat(rid, now, presence_on or schedule_on),
+                pre_heat_on=self._pre_heat(rid, now, presence_on or schedule_on, rcfg.get(F_PRE_HEAT_ENTITY)),
                 has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
                 window_open_too_long=win.open_too_long,
             ))
@@ -683,7 +711,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             switches = [(pump_entity, p.pump)] + switches if not p.pump else switches + [(pump_entity, p.pump)]
         out["would_switch"] = [f"{e} → {'an' if on else 'aus'}" for e, on in switches]
         out["would_write"] = bool(switches)
-        if switches and self.control.write_enabled and now - self._started >= STARTUP_GUARD_S:
+        if switches and self.control.write_enabled and self._settled(now):
             for entity_id, on in switches:
                 await self.hass.services.async_call(
                     "switch", "turn_on" if on else "turn_off", {"entity_id": entity_id}, blocking=True
@@ -709,7 +737,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             current_setpoint=_float(st.attributes.get("temperature")) or 0.0,
             schedule_on=r_schedule,
             presence_on=r_presence,
-            pre_heat_on=self._pre_heat(rid, now, r_presence or r_schedule),
+            pre_heat_on=self._pre_heat(rid, now, r_presence or r_schedule, rcfg.get(F_PRE_HEAT_ENTITY)),
             has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             window_closed_recently=win.closed_recently,

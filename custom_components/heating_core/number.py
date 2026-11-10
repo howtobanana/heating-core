@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from homeassistant.components.number import NumberMode, RestoreNumber
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEFAULTS, F_COMFORT, OPT_AWAY_TEMP, OPT_ECO, SUB_CIRCUIT, SUB_ROOM
+from .const import DEFAULTS, F_COMFORT, OPT_ACTIVATION_MIN, OPT_AWAY_TEMP, OPT_DEACTIVATION_MIN, OPT_ECO, SUB_CIRCUIT, SUB_ROOM
 from .entity import HeatingEntity
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
-    async_add_entities([GlobalTemp(coordinator, "eco"), GlobalTemp(coordinator, "away_temp")])
+    async_add_entities([GlobalTemp(coordinator, "eco"), GlobalTemp(coordinator, "away_temp"),
+                        PresenceDelay(coordinator, "presence_on_min", OPT_ACTIVATION_MIN, 60),
+                        PresenceDelay(coordinator, "presence_off_min", OPT_DEACTIVATION_MIN, 240)])
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT:
             # Absenkung gibt es je Heizkreis (Fabian, 08.11.2026), Räume erben sie; Abwesend bleibt global
@@ -42,6 +44,7 @@ class _Temp(HeatingEntity, RestoreNumber):
     async def async_set_native_value(self, value: float) -> None:
         self._store(value)
         self.async_write_ha_state()
+        self.coordinator.user_input()
         await self.coordinator.async_request_refresh()
 
 
@@ -111,3 +114,26 @@ class GlobalTemp(_Temp):
             return value
         opt = OPT_ECO if self._key == "eco" else OPT_AWAY_TEMP
         return float(self.coordinator.entry.options.get(opt, DEFAULTS[opt]))
+
+
+class PresenceDelay(_Temp):
+    """Glättung der Präsenz für alle Räume: an nach / aus nach (Minuten). Die geglättete Präsenz steht je Raum
+    als binary_sensor.<raum>_presence bereit und ersetzt die Präsenz-Helfer des Blueprints."""
+
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_native_step = 1.0
+    _attr_native_min_value = 0.0
+    _attr_mode = NumberMode.BOX
+
+    def __init__(self, coordinator, key: str, opt: str, maximum: float) -> None:
+        super().__init__(coordinator, key)
+        self._key, self._opt = key, opt
+        self._attr_translation_key = key
+        self._attr_native_max_value = maximum
+
+    def _store(self, value: float) -> None:
+        setattr(self.coordinator.control, self._key, value)
+
+    @property
+    def native_value(self) -> float:
+        return self.coordinator.presence_delay(self._opt)

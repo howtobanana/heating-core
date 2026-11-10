@@ -82,6 +82,7 @@ F_OFFSET = "offset"
 F_COMFORT = "comfort"
 F_COMFORT_ENTITY = "comfort_entity"
 F_PRESENCE = "presence_sensors"
+F_PRE_HEAT_ENTITY = "pre_heat_entity"  # optional: Helfer, den z. B. das Geofencing einschaltet (HEATING-34)
 F_SCHEDULE = "schedule"
 F_WINDOW = "window"
 F_TEMP = "temp_sensor"
@@ -98,6 +99,7 @@ F_VALVE_DELAY = "valve_delay_s"
 F_VALVES = "valves"
 
 STARTUP_GUARD_S = 120
+USER_SETTLE_S = 30  # nach einer Eingabe an Reglern so lange warten, bevor geschrieben wird (Blueprint: Debounce 30 s)
 UPDATE_INTERVAL_S = 180
 
 MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing", "circuit_off", "disabled"]

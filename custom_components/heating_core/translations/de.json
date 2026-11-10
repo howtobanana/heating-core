@@ -137,7 +137,8 @@
             "source_on": "Freigabe ab Kesseltemperatur",
             "source_off": "Sperre unter Kesseltemperatur",
             "valve_delay_s": "Pumpe erst nach Ventil-Öffnen (s)",
-            "hvac_mode": "Betriebsart nach dem Sommer"
+            "hvac_mode": "Betriebsart nach dem Sommer",
+            "pre_heat_entity": "Vorheizen-Helfer (optional)"
           },
           "description": "Geräte und Bedarfsquellen des Heizkreises. Komfort und Absenkung stellst du danach am Regler ein.",
           "data_description": {
@@ -152,7 +153,8 @@
             "source_on": "Ab dieser Kesseltemperatur darf die Fußbodenpumpe laufen.",
             "source_off": "Unter dieser Kesseltemperatur wird die Pumpe gesperrt. Muss unter der Freigabe liegen.",
             "valve_delay_s": "So lange nach dem Öffnen der Ventile warten, bevor die Pumpe startet (Stellantriebe brauchen Zeit).",
-            "hvac_mode": "Nur Vaillant: Betriebsart der Zone, die nach dem Sommer wieder gesetzt wird. Handbetrieb: Sollwert direkt. Zeitprogramm: Heating Core setzt ein Quick-Veto und erneuert es."
+            "hvac_mode": "Nur Vaillant: Betriebsart der Zone, die nach dem Sommer wieder gesetzt wird. Handbetrieb: Sollwert direkt. Zeitprogramm: Heating Core setzt ein Quick-Veto und erneuert es.",
+            "pre_heat_entity": "Optional, z. B. für das Geofencing: Ist dieser Schalter an, heizt Heating Core vor wie mit dem Knopf „Vorheizen“, und schaltet ihn nach dem Zeitlimit oder sobald Präsenz/Zeitplan übernimmt wieder aus. Leer = nur der eigene Knopf."
           }
         }
       },
@@ -206,7 +208,8 @@
             "presence_sensors": "Präsenzsensoren",
             "schedule": "Eigener Zeitplan (sonst der des Heizkreises)",
             "window": "Fensterkontakt",
-            "temp_sensor": "Temperatursensor"
+            "temp_sensor": "Temperatursensor",
+            "pre_heat_entity": "Vorheizen-Helfer (optional)"
           },
           "description": "Geräte des Raums. Komfort stellst du danach am Regler, im Dashboard oder auf der Seite „Heizung“ ein; die Absenkung kommt vom Heizkreis.",
           "data_description": {
@@ -216,7 +219,8 @@
             "presence_sensors": "Präsenzmelder im Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
             "schedule": "Eigener Zeitplan nur für diesen Raum. Leer lassen = Zeitplan des Heizkreises.",
             "window": "Fensterkontakt im Raum. Offen länger als die Fenster-Verzögerung → Minimum.",
-            "temp_sensor": "Eigener Raumfühler. Genauer als der Fühler im Thermostat am Heizkörper."
+            "temp_sensor": "Eigener Raumfühler. Genauer als der Fühler im Thermostat am Heizkörper.",
+            "pre_heat_entity": "Optional, z. B. für das Geofencing: Ist dieser Schalter an, heizt Heating Core vor wie mit dem Knopf „Vorheizen“, und schaltet ihn nach dem Zeitlimit oder sobald Präsenz/Zeitplan übernimmt wieder aus. Leer = nur der eigene Knopf."
           }
         }
       },
@@ -327,6 +331,12 @@
       },
       "setback": {
         "name": "Absenkung"
+      },
+      "presence_on_min": {
+        "name": "Präsenz an nach"
+      },
+      "presence_off_min": {
+        "name": "Präsenz aus nach"
       }
     }
   }

@@ -49,7 +49,11 @@
           "push_enabled": "Push to phone",
           "notify_devices": "Phones (mobile app)",
           "quiet_schedule": "Quiet time (schedule, no pushes)",
-          "leitstand_expert": "Expert log (full details of every run as notification)"
+          "leitstand_expert": "Expert log (full details of every run as notification)",
+          "room_demand_delta": "Room requests heat from",
+          "pre_heat_lead": "Start comfort earlier",
+          "summer_mean_sensor": "Outdoor temperature, 72 h mean (automatic summer)",
+          "summer_limit": "Heating limit"
         },
         "description": "Applies to the whole system. Set comfort and setback per circuit or room on its slider or on the Heating page.",
         "data_description": {
@@ -79,7 +83,11 @@
           "push_enabled": "Sends writes and new problems to phones. The problem notification in HA is always on.",
           "notify_devices": "Phones with the Home Assistant app that receive pushes.",
           "quiet_schedule": "While this schedule is on (e.g. at night), no pushes are sent.",
-          "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting."
+          "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting.",
+          "room_demand_delta": "Ökofen only: a room raises the whole circuit only when it is this far below its comfort. Otherwise it heats via its own thermostat and the boiler keeps running calmly. 0 = every room may raise it at once.",
+          "pre_heat_lead": "Ökofen only: comfort starts this many hours before the schedule because the boiler is slow. The Heating page then shows “Pre-heating for …”. 0 = schedule applies exactly.",
+          "summer_mean_sensor": "Statistics helper with the rolling 72 h mean of the outdoor temperature. If set and the summer switch is an input_boolean, Heating Core switches summer itself – only while writing is on. Empty = summer only by hand.",
+          "summer_limit": "Summer from heating limit + 1.5 °C (72 h mean), heating season again below heating limit − 1.5 °C."
         }
       }
     }
@@ -129,11 +137,12 @@
             "source_on": "Release above boiler temperature",
             "source_off": "Block below boiler temperature",
             "valve_delay_s": "Pump only after valves opened (s)",
-            "hvac_mode": "Operating mode after summer"
+            "hvac_mode": "Operating mode after summer",
+            "pre_heat_entity": "Pre-heat helper (optional)"
           },
           "description": "Devices and demand sources of the circuit. Set comfort and setback on its sliders afterwards.",
           "data_description": {
-            "master_climate": "The zone or circuit at the heat source that receives the setpoint.",
+            "master_climate": "The zone or circuit at the heat source that receives the setpoint. Ökofen: on the Pellematic, switch this circuit's room sensor off (room influence 0) and eco mode off – otherwise it shuts the circuit down itself (see README).",
             "presence_sensors": "Presence sensors in the leading room. Presence → comfort, even outside the schedule.",
             "schedule": "Schedule helper: on = comfort, off = setback. Rooms without their own schedule follow it. Without schedule and presence the circuit always uses comfort.",
             "window": "Window contact in the leading room. Open longer than the window delay → minimum.",
@@ -144,7 +153,8 @@
             "source_on": "The floor pump may run above this boiler temperature.",
             "source_off": "Below this boiler temperature the pump is blocked. Must be below the release.",
             "valve_delay_s": "Wait this long after opening the valves before starting the pump.",
-            "hvac_mode": "Vaillant only: zone mode set again after summer. Manual: setpoint directly. Time program: Heating Core sets and renews a quick veto."
+            "hvac_mode": "Vaillant only: zone mode set again after summer. Manual: setpoint directly. Time program: Heating Core sets and renews a quick veto.",
+            "pre_heat_entity": "Optional, e.g. for geofencing: while this switch is on, Heating Core pre-heats like the “Pre-heat” button and turns it off after the timeout or once presence/schedule takes over. Empty = only the built-in button."
           }
         }
       },
@@ -198,7 +208,8 @@
             "presence_sensors": "Presence sensors",
             "schedule": "Own schedule (else the circuit's)",
             "window": "Window contact",
-            "temp_sensor": "Temperature sensor"
+            "temp_sensor": "Temperature sensor",
+            "pre_heat_entity": "Pre-heat helper (optional)"
           },
           "description": "Devices of the room. Set comfort on its slider, dashboard or Heating page; setback comes from the circuit.",
           "data_description": {
@@ -208,7 +219,8 @@
             "presence_sensors": "Presence sensors in the room. Presence → comfort, even outside the schedule.",
             "schedule": "Own schedule for this room only. Empty = the circuit's schedule.",
             "window": "Window contact in the room. Open longer than the window delay → minimum.",
-            "temp_sensor": "Own room sensor. More accurate than the sensor inside the thermostat."
+            "temp_sensor": "Own room sensor. More accurate than the sensor inside the thermostat.",
+            "pre_heat_entity": "Optional, e.g. for geofencing: while this switch is on, Heating Core pre-heats like the “Pre-heat” button and turns it off after the timeout or once presence/schedule takes over. Empty = only the built-in button."
           }
         }
       },
@@ -260,6 +272,9 @@
       },
       "pre_heat": {
         "name": "Pre-heat"
+      },
+      "enabled": {
+        "name": "Circuit on"
       }
     },
     "sensor": {
@@ -285,7 +300,8 @@
           "floor_idle": "Floor idle",
           "source_cold": "Boiler too cold",
           "sensor_missing": "Sensor missing",
-          "circuit_off": "Circuit off (by the system)"
+          "circuit_off": "Circuit off (by the system)",
+          "disabled": "Switched off"
         }
       },
       "fuel": {
@@ -315,6 +331,12 @@
       },
       "setback": {
         "name": "Setback"
+      },
+      "presence_on_min": {
+        "name": "Presence on after"
+      },
+      "presence_off_min": {
+        "name": "Presence off after"
       }
     }
   }

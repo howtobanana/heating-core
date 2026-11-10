@@ -219,3 +219,61 @@ async def test_sommer_automatisch_aus_72h_mittel(hass: HomeAssistant, states) ->
         hass.states.async_set("sensor.aussen_72h", "18.5")
         await coordinator.async_refresh()
     assert [c.data["entity_id"] for c in on] == ["input_boolean.sommer"]
+
+
+async def test_entprellung_regler_schreibt_erst_nach_30s(hass: HomeAssistant, states) -> None:
+    """Blueprint-Debounce: mehrere Klicks am Regler -> ein Schreibvorgang, erst nach 30 s Ruhe."""
+    import time as _t
+
+    coordinator = await _setup(hass, _entry())
+    calls = async_mock_service(hass, "climate", "set_temperature")
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
+        coordinator._started = 0
+        await hass.services.async_call("number", "set_value", {"entity_id": "number.kreis_comfort", "value": 23.5}, blocking=True)
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert float(_sensor(hass, "kreis_setpoint").state) == 23.5  # sofort gerechnet und angezeigt
+        assert not [c for c in calls if c.data["entity_id"] == ZONE]  # aber noch nicht geschrieben
+        coordinator.user_input_at = _t.time() - 31
+        await coordinator.async_refresh()
+    assert [c.data["temperature"] for c in calls if c.data["entity_id"] == ZONE] == [23.5]
+
+
+async def test_vorheizen_helfer_geofencing(hass: HomeAssistant, states) -> None:
+    """Optionaler Vorheizen-Helfer (HEATING-34): an = vorheizen; nach dem Zeitlimit schaltet Heating Core ihn aus."""
+    import time as _t
+
+    helper = "input_boolean.preheat_kreis"
+    hass.states.async_set(PRESENCE, "off")
+    hass.states.async_set(helper, "on")
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
+        options={"eco_temp": 19.0, "min_trv_temp": 8.0, "presence_activation_min": 0, "boost_enabled": False},
+        subentries_data=[ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0,
+                                                  "presence_sensors": [PRESENCE], "pre_heat_entity": helper},
+                                            subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None)],
+    )
+    coordinator = await _setup(hass, entry)
+    assert coordinator.data["circuits"]["kreis1"]["mode"] == "pre_heat"
+    assert float(_sensor(hass, "kreis_setpoint").state) == 22.0
+    off = async_mock_service(hass, "input_boolean", "turn_off")
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.time.time", return_value=_t.time() + 91 * 60):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert coordinator.data["circuits"]["kreis1"]["mode"] != "pre_heat"
+    assert [c.data["entity_id"] for c in off] == [helper]
+
+
+async def test_praesenz_verzoegerung_als_regler(hass: HomeAssistant, states) -> None:
+    """Präsenz an/aus nach als Regler (überschreiben die Optionen, für alle Räume)."""
+    from custom_components.heating_core.const import OPT_ACTIVATION_MIN, OPT_DEACTIVATION_MIN
+
+    coordinator = await _setup(hass, _entry())
+    on = next(s.entity_id for s in hass.states.async_all("number") if s.entity_id.endswith("presence_on_after"))
+    off = next(s.entity_id for s in hass.states.async_all("number") if s.entity_id.endswith("presence_off_after"))
+    assert float(hass.states.get(off).state) == 30.0  # Vorgabe aus den Optionen
+    await hass.services.async_call("number", "set_value", {"entity_id": on, "value": 10}, blocking=True)
+    await hass.services.async_call("number", "set_value", {"entity_id": off, "value": 45}, blocking=True)
+    assert (coordinator.presence_delay(OPT_ACTIVATION_MIN), coordinator.presence_delay(OPT_DEACTIVATION_MIN)) == (10.0, 45.0)
