@@ -34,7 +34,7 @@ der zuletzt geschriebene Zustand stehen (HEATING-35):
 | Anlage | Was passiert | Rückfall |
 |---|---|---|
 | Ökofen (Perg) | Der Kreis bleibt auf „heizen“ bzw. „absenken“ mit dem letzten Offset. Die Heizkurve der Pellematic regelt weiter nach der Außentemperatur, Frostschutz bleibt aktiv. | Kein eigener Rückfall nötig: Schlimmstenfalls bleibt es zu warm (Komfort) oder kühler (Absenkung), aber nie kalt. Wer sofort das Zeitprogramm der Pellematic will: am Display Betriebsart „Auto“. |
-| Vaillant, Handbetrieb `heat_cool` (Wien heute) | Der letzte Sollwert bleibt dauerhaft stehen, z. B. 25 °C nach einem Boost oder 17 °C bei Abwesend. | **Betriebsart „auto“ (Zeitprogramm) im Formular des Kreises wählen.** Dann schreibt Heating Core ein Quick-Veto mit begrenzter Dauer und erneuert es laufend; fällt Home Assistant aus, endet das Quick-Veto nach höchstens der in myVaillant eingestellten Dauer, und die Therme folgt wieder ihrem Zeitprogramm (Wien: 19 °C von 6:00 bis 23:50). |
+| Vaillant, Handbetrieb `heat_cool` (Wien heute) | Der letzte Sollwert bleibt dauerhaft stehen, z. B. 25 °C nach einem Boost oder 17 °C bei Abwesend. | **Zone der Therme auf Zeitprogramm („auto“) stellen und im Formular des Kreises „Betriebsart nach dem Sommer“ = auto.** Dann schreibt Heating Core ein Quick-Veto mit begrenzter Dauer und erneuert es laufend; fällt Home Assistant aus, endet das Quick-Veto nach höchstens der in myVaillant eingestellten Dauer, und die Therme folgt wieder ihrem Zeitprogramm (Wien: 19 °C von 6:00 bis 23:50). |
 | TRVs | Behalten den letzten Sollwert, regeln aber mit ihrem eigenen Fühler weiter. | – |
 
 ## Stand
