@@ -87,6 +87,7 @@ from .timing import Reading, presence, window
 from .writes import Decision, Write, WriteConfig, decide
 from . import trv as trv_tools
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 
 _LOGGER = logging.getLogger(__name__)
 TRV_READBACK_S = 5 * 60
@@ -430,6 +431,10 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if state.room_sensor_off and any(res.active and res.needs_heat for _, res in isolated):
             # Raumfühler der Anlage sperrt den Kreis, obwohl ein Raum Wärme braucht: an der Anlage umstellen (HEATING-29)
             out["problem"] = "room_sensor_blocks"
+            # Prominent unter Einstellungen → Reparaturen, mit Anleitung; bleibt bis zur Bestätigung (repairs.py)
+            ir.async_create_issue(self.hass, DOMAIN, f"room_sensor_blocks_{cid}", is_fixable=True,
+                                  severity=ir.IssueSeverity.WARNING, translation_key="room_sensor_blocks",
+                                  translation_placeholders={"circuit": ccfg[F_NAME]})
         out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence, window_open=win.open_too_long, pump_on=state.pump_on,
                    current=current, budget_left=None, mode=_circuit_mode(m_res, m_in, g))
         if plan in ("lead", "skip"):

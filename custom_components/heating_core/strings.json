@@ -339,5 +339,18 @@
         "name": "Presence off after"
       }
     }
+  },
+  "issues": {
+    "room_sensor_blocks": {
+      "title": "{circuit}: Pellematic room sensor switches the circuit off",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Change it on the Pellematic",
+            "description": "The Pellematic switched **{circuit}** off (“room temperature reached”) although rooms on this circuit still need heat. Its room sensor measures only one room and thereby blocks the whole circuit – the other rooms stay cold although their valves are open.\n\n**How to change it** (only on the Pellematic display, in the Ökofen app or on my.oekofen.com, not in Home Assistant):\n1. Open heating circuit **{circuit}**.\n2. Set **room sensor off** or **room influence 0** (if the item is missing: installer level, code from your installer).\n3. Keep **eco mode** of this circuit **off**.\n\nAfterwards Heating Core controls the circuit via the rooms; the Pellematic heating curve stays active. Only confirm once it is changed – if the room sensor keeps blocking, this message comes back."
+          }
+        }
+      }
+    }
   }
 }

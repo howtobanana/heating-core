@@ -339,5 +339,18 @@
         "name": "Präsenz aus nach"
       }
     }
+  },
+  "issues": {
+    "room_sensor_blocks": {
+      "title": "{circuit}: Raumfühler der Pellematic schaltet den Kreis ab",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "An der Pellematic umstellen",
+            "description": "Die Pellematic hat **{circuit}** abgeschaltet („Raumtemperatur erreicht“), obwohl Räume in diesem Kreis noch Wärme brauchen. Ihr Raumfühler misst nur einen Raum und sperrt damit den ganzen Kreis – die anderen Räume bleiben kalt, obwohl ihre Ventile offen sind.\n\n**So stellst du es um** (geht nur am Display der Pellematic, in der Ökofen-App oder auf my.oekofen.com, nicht in Home Assistant):\n1. Heizkreis **{circuit}** öffnen.\n2. **Raumfühler aus** bzw. **Raumeinfluss 0** einstellen (fehlt der Punkt im Menü: Fachmann-Ebene, Code beim Installateur).\n3. **Ökomodus** dieses Kreises **aus** lassen.\n\nDanach regelt Heating Core den Kreis über die Räume, die Heizkurve der Pellematic bleibt aktiv. Erst bestätigen, wenn es umgestellt ist – sperrt der Raumfühler weiter, erscheint diese Meldung wieder."
+          }
+        }
+      }
+    }
   }
 }

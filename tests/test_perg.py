@@ -382,6 +382,9 @@ async def test_raumfuehler_der_pellematic_sperrt_kreis(hass: HomeAssistant) -> N
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["problem"] == "room_sensor_blocks"
     assert any("Raumfühler der Pellematic" in p for p in collect_problems(coordinator.data))
+    from homeassistant.helpers import issue_registry as ir
+    issue = ir.async_get(hass).async_get_issue("heating_core", "room_sensor_blocks_hk1")
+    assert issue and issue.is_fixable and issue.translation_placeholders == {"circuit": "HK1"}  # Einstellungen → Reparaturen
     hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})  # Raum warm genug
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"].get("problem") is None
