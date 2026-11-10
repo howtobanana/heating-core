@@ -41,6 +41,15 @@ def test_raum_absenkung_nie_ueber_komfort():
     assert r.target == 18
 
 
+def test_raum_waermebedarf_mit_hysterese():
+    # Office Wien 10.11.2026: Fühler zittert 22,4/22,5 bei Ziel 23 -> Bedarf darf nicht bei jedem Lauf kippen (HEATING-11)
+    r = room(comfort=23, presence_on=True, current_setpoint=23)
+    assert room_target(G, r.__class__(**{**r.__dict__, "current_temp": 22.4})).needs_heat
+    assert not room_target(G, r.__class__(**{**r.__dict__, "current_temp": 22.5})).needs_heat  # ohne Vorlauf: erst unter 22,5
+    assert room_target(G, r.__class__(**{**r.__dict__, "current_temp": 22.5, "needed_heat": True})).needs_heat  # hält bis 23
+    assert not room_target(G, r.__class__(**{**r.__dict__, "current_temp": 23.0, "needed_heat": True})).needs_heat
+
+
 def test_raum_praesenz_heizt_auf_komfort():
     r = room_target(G, room(presence_on=True))
     assert (r.target, r.mode, r.needs_heat) == (21, "presence", True)

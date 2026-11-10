@@ -46,6 +46,7 @@ class RoomInput:
     has_demand_source: bool = True  # Zeitplan, Präsenz-Helfer oder -Sensor eingerichtet
     window_open_too_long: bool = False
     window_closed_recently: bool = False
+    needed_heat: bool = False  # Wärmebedarf im letzten Lauf (Hysterese, HEATING-11)
 
 
 @dataclass(frozen=True)
@@ -117,7 +118,9 @@ def room_target(g: Globals, r: RoomInput) -> RoomResult:
     else:
         mode = "eco"
 
-    needs_heat = active and target > r.current_temp + g.hysteresis and not g.summer
+    # Hysterese: Bedarf beginnt unter Ziel − Hysterese und endet erst am Ziel; sonst kippt ein zitternder Fühler
+    # (Office Wien 22,4/22,5 °C) den ganzen Kreis alle 10 s zwischen Komfort und Absenkung (HEATING-11)
+    needs_heat = active and not g.summer and target > r.current_temp + (0.0 if r.needed_heat else g.hysteresis)
     return RoomResult(target=target, mode=mode, active=active, needs_heat=needs_heat)
 
 

@@ -111,6 +111,7 @@ class ControlState:
     write_enabled: bool = False  # Schattenbetrieb, bis jemand bewusst einschaltet
     writes: dict[str, list[Write]] = field(default_factory=dict)
     presence: dict[str, bool] = field(default_factory=dict)
+    needs_heat: dict[str, bool] = field(default_factory=dict)  # Raum -> Wärmebedarf im letzten Lauf
     pre_heat: dict[str, float] = field(default_factory=dict)  # Subentry -> Start (Sekunden)
     source_ok: dict[str, bool] = field(default_factory=dict)  # Fußbodenkreis -> Kessel freigegeben
     comfort: dict[str, float] = field(default_factory=dict)  # Regler „Komfort“ je Kreis/Raum
@@ -329,6 +330,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": "unavailable", "target": None, "problem": "room_unavailable"}
                 continue
             r_res = room_target(g_room, r_in)
+            self.control.needs_heat[rid] = r_res.needs_heat
             isolated.append((r_in, r_res))
             out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": r_res.mode, "target": r_res.target, "entity": rcfg[F_CLIMATE],
                                  "setpoint": r_in.current_setpoint, "presence": r_in.presence_on, "current": r_in.current_temp,
@@ -696,6 +698,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             window_closed_recently=win.closed_recently,
+            needed_heat=self.control.needs_heat.get(rid, False),
         )
 
 
