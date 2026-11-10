@@ -208,8 +208,7 @@
             "presence_sensors": "Presence sensors",
             "schedule": "Own schedule (else the circuit's)",
             "window": "Window contact",
-            "temp_sensor": "Temperature sensor",
-            "pre_heat_entity": "Pre-heat helper (optional)"
+            "temp_sensor": "Temperature sensor"
           },
           "description": "Devices of the room. Set comfort on its slider, dashboard or Heating page; setback comes from the circuit.",
           "data_description": {
@@ -219,8 +218,7 @@
             "presence_sensors": "Presence sensors in the room. Presence → comfort, even outside the schedule.",
             "schedule": "Own schedule for this room only. Empty = the circuit's schedule.",
             "window": "Window contact in the room. Open longer than the window delay → minimum.",
-            "temp_sensor": "Own room sensor. More accurate than the sensor inside the thermostat.",
-            "pre_heat_entity": "Optional, e.g. for geofencing: while this switch is on, Heating Core pre-heats like the “Pre-heat” button and turns it off after the timeout or once presence/schedule takes over. Empty = only the built-in button."
+            "temp_sensor": "Own room sensor. More accurate than the sensor inside the thermostat."
           }
         }
       },
@@ -249,7 +247,8 @@
       "options": {
         "isolated": "Own room",
         "follower": "Follows master",
-        "floor_zone": "Floor zone (valves)"
+        "floor_zone": "Floor zone (valves)",
+        "passive": "Radiator without thermostat (display only)"
       }
     },
     "hvac_mode": {
@@ -301,7 +300,8 @@
           "source_cold": "Boiler too cold",
           "sensor_missing": "Sensor missing",
           "circuit_off": "Circuit off (by the system)",
-          "disabled": "Switched off"
+          "disabled": "Switched off",
+          "passive": "No thermostat"
         }
       },
       "fuel": {

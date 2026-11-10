@@ -277,3 +277,46 @@ async def test_praesenz_verzoegerung_als_regler(hass: HomeAssistant, states) -> 
     await hass.services.async_call("number", "set_value", {"entity_id": on, "value": 10}, blocking=True)
     await hass.services.async_call("number", "set_value", {"entity_id": off, "value": 45}, blocking=True)
     assert (coordinator.presence_delay(OPT_ACTIVATION_MIN), coordinator.presence_delay(OPT_DEACTIVATION_MIN)) == (10.0, 45.0)
+
+
+async def test_vorheizen_je_kreis_raeume_heizen_mit(hass: HomeAssistant, states) -> None:
+    """Vorheizen gibt es nur je Heizkreis; seine Räume gehen mit auf Komfort (Fabian 11.11.2026)."""
+    hass.states.async_set(PRESENCE, "off")
+    hass.states.async_set(TRV, "heat", {"temperature": 19, "current_temperature": 18.0})  # Raum kalt
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
+        options={"eco_temp": 19.0, "min_trv_temp": 8.0, "presence_activation_min": 0, "boost_enabled": False},
+        subentries_data=[
+            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0, "presence_sensors": [PRESENCE]},
+                               subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
+            ConfigSubentryData(data={"circuit": "kreis1", "role": "isolated", "climate": TRV, "comfort": 21.0},
+                               subentry_id="raum1", subentry_type="room", title="Büro", unique_id=None),
+        ],
+    )
+    coordinator = await _setup(hass, entry)
+    assert hass.states.get("switch.buro_pre_heat") is None  # kein Vorheizen je Raum
+    assert coordinator.data["circuits"]["kreis1"]["rooms"]["raum1"]["target"] == 19.0
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.kreis_pre_heat"}, blocking=True)
+    await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["kreis1"]["rooms"]["raum1"]["target"] == 21.0  # Raum heizt mit
+
+
+async def test_heizkoerper_ohne_trv_nur_anzeige(hass: HomeAssistant, states) -> None:
+    """HEATING-38: passiver Heizkörper – im Kreis sichtbar, regelt nichts, kein Thermostat/Komfort."""
+    hass.states.async_set("sensor.flur", "19.5")
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Test", unique_id="test", data={"name": "Test", "manufacturer": "vaillant"},
+        options={"eco_temp": 19.0, "min_trv_temp": 8.0, "presence_activation_min": 0, "boost_enabled": False},
+        subentries_data=[
+            ConfigSubentryData(data={"kind": "radiator", "master_climate": ZONE, "comfort": 22.0, "schedule": IMMER},
+                               subentry_id="kreis1", subentry_type="circuit", title="Kreis", unique_id=None),
+            ConfigSubentryData(data={"circuit": "kreis1", "role": "passive", "temp_sensor": "sensor.flur"},
+                               subentry_id="flur", subentry_type="room", title="Flur", unique_id=None),
+        ],
+    )
+    coordinator = await _setup(hass, entry)
+    flur = coordinator.data["circuits"]["kreis1"]["rooms"]["flur"]
+    assert (flur["mode"], flur["current"], flur["target"], flur.get("entity")) == ("passive", 19.5, None, None)
+    assert hass.states.get("climate.flur") is None and hass.states.get("number.flur_comfort") is None
+    assert hass.states.get("sensor.flur_mode").state == "passive"
+    assert float(_sensor(hass, "kreis_setpoint").state) == 22.0  # Kreis regelt unverändert

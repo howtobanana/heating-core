@@ -15,7 +15,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     coordinator = entry.runtime_data
     async_add_entities([Problem(coordinator)])
     for sid, sub in entry.subentries.items():
-        if sub.subentry_type == SUB_CIRCUIT or (sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower"):
+        if sub.subentry_type == SUB_CIRCUIT or (sub.subentry_type == SUB_ROOM and sub.data.get("role") not in ("follower", "passive")):
             if sub.data.get("presence_sensors"):
                 async_add_entities([Presence(coordinator, sid, sub.title, sub.subentry_type == SUB_CIRCUIT)], config_subentry_id=sid)
 

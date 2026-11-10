@@ -20,8 +20,10 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
             async_add_entities([CircuitTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, True),
                                 Deviation(coordinator, sid, sub.title, True)], config_subentry_id=sid)
         elif sub.subentry_type == SUB_ROOM:
-            async_add_entities([RoomTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, False),
-                                Deviation(coordinator, sid, sub.title, False)], config_subentry_id=sid)
+            new = [RoomTarget(coordinator, sid, sub.title), Mode(coordinator, sid, sub.title, False)]
+            if sub.data.get("role") != "passive":  # ohne TRV gibt es keinen Sollwert an der Anlage
+                new.append(Deviation(coordinator, sid, sub.title, False))
+            async_add_entities(new, config_subentry_id=sid)
 
 
 class _Target(HeatingEntity, SensorEntity):

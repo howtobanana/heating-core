@@ -34,6 +34,7 @@ from .const import (
     F_VALVES,
     KIND_FLOOR_EXTERNAL,
     ROLE_FLOOR_ZONE,
+    ROLE_PASSIVE,
     F_KIND,
     F_MASTER,
     F_OFFSET,
@@ -194,7 +195,6 @@ def _common(d: dict, schedule: bool = True, window: bool = True, temp: bool = Tr
     if schedule:
         out[_opt(F_PRESENCE, d)] = _entity(["binary_sensor", "input_boolean"], multiple=True)  # Geofencing Wien: input_boolean.presence_* (HEATING-33)
         out[_opt(F_SCHEDULE, d)] = _entity("schedule")
-        out[_opt(F_PRE_HEAT_ENTITY, d)] = _entity("input_boolean")  # optional, z. B. Geofencing
     if window:
         out[_opt(F_WINDOW, d)] = _entity("binary_sensor")
     if temp:
@@ -274,11 +274,13 @@ class CircuitFlow(_BaseSubFlow):
                 vol.Required(F_SOURCE_OFF, default=d.get(F_SOURCE_OFF, 45.0)): _num(20, 90, 1, "°C"),
                 vol.Required(F_VALVE_DELAY, default=d.get(F_VALVE_DELAY, 180)): _num(0, 900, 10, "s"),
                 **_common(d, window=False, temp=False),  # Zeitplan/Präsenz erben die Zonen
+                _opt(F_PRE_HEAT_ENTITY, d): _entity("input_boolean"),  # Vorheizen je Kreis, z. B. Geofencing
             })
         fields = {
             _req(F_MASTER, d): _entity("climate"),
             **_common(d),
             _opt(F_HUMIDITY, d): _entity("sensor", device_class="humidity"),
+            _opt(F_PRE_HEAT_ENTITY, d): _entity("input_boolean"),  # Vorheizen je Kreis, z. B. Geofencing
         }
         if self._get_entry().data.get(CONF_MANUFACTURER) == "vaillant":
             # Betriebsart, die nach dem Sommer wieder gesetzt wird (Blueprint: master_hvac_mode)
@@ -306,7 +308,7 @@ class RoomFlow(_BaseSubFlow):
             vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
             _req(F_CIRCUIT, d): sel.SelectSelector(sel.SelectSelectorConfig(options=circuits)),
             vol.Required(F_ROLE, default=d.get(F_ROLE, "isolated")): sel.SelectSelector(
-                sel.SelectSelectorConfig(options=["isolated", "follower", ROLE_FLOOR_ZONE], translation_key=F_ROLE)
+                sel.SelectSelectorConfig(options=["isolated", "follower", ROLE_FLOOR_ZONE, ROLE_PASSIVE], translation_key=F_ROLE)
             ),
         })
 
@@ -314,6 +316,8 @@ class RoomFlow(_BaseSubFlow):
         role = d.get(F_ROLE)
         if role == ROLE_FLOOR_ZONE:
             return vol.Schema({_req(F_VALVES, d): _entity(["switch", "input_boolean"], multiple=True), **_common(d)})
+        if role == ROLE_PASSIVE:
+            return vol.Schema({_opt(F_TEMP, d): _entity("sensor", device_class="temperature")})
         if role == "follower":
             return vol.Schema({
                 _req(F_CLIMATE, d): _entity("climate"),

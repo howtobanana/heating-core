@@ -41,6 +41,7 @@ from .const import (
     F_OFFSET,
     F_PRE_HEAT_ENTITY,
     F_PRESENCE,
+    ROLE_PASSIVE,
     F_ROLE,
     F_SCHEDULE,
     F_TEMP,
@@ -350,13 +351,19 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         g_all, g = g, replace(g, eco=self.setback(cid, g.eco))
         out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": state.available}
 
+        # Vorheizen gilt je Heizkreis; seine Räume heizen mit (Fabian 11.11.2026: nur einen Raum vorheizen ist ineffizient)
+        m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
+        c_pre = self._pre_heat(cid, now, m_presence or self._on(ccfg.get(F_SCHEDULE)), ccfg.get(F_PRE_HEAT_ENTITY))
         isolated: list[tuple[RoomInput, Any]] = []
         followers: list[tuple[str, dict]] = []
         for rid, rcfg in self.rooms(cid).items():
+            if rcfg.get(F_ROLE) == ROLE_PASSIVE:
+                out["rooms"][rid] = self._passive(rcfg)
+                continue
             if rcfg.get(F_ROLE) == "follower":
                 followers.append((rid, rcfg))
                 continue
-            r_in = self._room_input(rid, rcfg, now)
+            r_in = self._room_input(rid, rcfg, now, c_pre)
             g_room = replace(g_all, eco=self.setback(rid, g_all.eco))
             if r_in is None:
                 out["rooms"][rid] = {"name": rcfg[F_NAME], "mode": "unavailable", "target": None, "problem": "room_unavailable"}
@@ -396,7 +403,6 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             out["problem"] = "temperature_unknown"
             await self._write_rooms(out, g, now)
             return out
-        m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
         plan = self._gentle_schedule(ccfg.get(F_SCHEDULE), now) if lim.gentle else ("on" if self._on(ccfg.get(F_SCHEDULE)) else None)
         m_schedule = plan is not None
         m_in = MasterInput(
@@ -405,7 +411,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             set_now=state.setpoint or 0.0,
             schedule_on=m_schedule,
             presence_on=m_presence,
-            pre_heat_on=self._pre_heat(cid, now, m_presence or m_schedule, ccfg.get(F_PRE_HEAT_ENTITY)),
+            pre_heat_on=c_pre,
             has_demand_source=bool(ccfg.get(F_SCHEDULE) or ccfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             any_window_open=any_window,
@@ -654,7 +660,11 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         out: dict[str, Any] = {"name": ccfg[F_NAME], "rooms": {}, "available": True, "target": None}
         zones: list[Zone] = []
         valves_by_zone: dict[str, list[str]] = {}
+        c_pre = self._pre_heat(cid, now, self._on(ccfg.get(F_SCHEDULE)), ccfg.get(F_PRE_HEAT_ENTITY))
         for rid, rcfg in self.rooms(cid).items():
+            if rcfg.get(F_ROLE) == ROLE_PASSIVE:
+                out["rooms"][rid] = self._passive(rcfg)
+                continue
             valves = rcfg.get(F_VALVES) or []
             valves_by_zone[rid] = valves
             readings = [self._reading(v) for v in valves]
@@ -668,7 +678,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             target, _active = room_base(replace(g, eco=self.setback(rid, g.eco)), RoomInput(
                 comfort=self._comfort(rcfg, rid), current_temp=temp or 0.0, current_setpoint=0.0,
                 schedule_on=schedule_on, presence_on=presence_on,
-                pre_heat_on=self._pre_heat(rid, now, presence_on or schedule_on, rcfg.get(F_PRE_HEAT_ENTITY)),
+                pre_heat_on=c_pre,
                 has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
                 window_open_too_long=win.open_too_long,
             ))
@@ -724,7 +734,11 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._events.append(f"{ccfg[F_NAME]}: " + ", ".join(f"{e.split('.')[-1]} {'an' if on else 'aus'}" for e, on in switches))
         return out
 
-    def _room_input(self, rid: str, rcfg: dict, now: float) -> RoomInput | None:
+    def _passive(self, rcfg: dict) -> dict[str, Any]:
+        """Heizkörper ohne TRV (HEATING-38): wird vom Heizkreis mitversorgt, nur Anzeige, keine Regelung."""
+        return {"name": rcfg[F_NAME], "mode": ROLE_PASSIVE, "target": None, "current": self._num(rcfg.get(F_TEMP)), "passive": True}
+
+    def _room_input(self, rid: str, rcfg: dict, now: float, circuit_pre_heat: bool = False) -> RoomInput | None:
         climate = rcfg.get(F_CLIMATE)
         st = self.hass.states.get(climate) if climate else None
         if st is None or st.state in ("unavailable", "unknown"):
@@ -742,7 +756,7 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             current_setpoint=_float(st.attributes.get("temperature")) or 0.0,
             schedule_on=r_schedule,
             presence_on=r_presence,
-            pre_heat_on=self._pre_heat(rid, now, r_presence or r_schedule, rcfg.get(F_PRE_HEAT_ENTITY)),
+            pre_heat_on=circuit_pre_heat,
             has_demand_source=bool(sched or rcfg.get(F_PRESENCE)),
             window_open_too_long=win.open_too_long,
             window_closed_recently=win.closed_recently,

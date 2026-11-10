@@ -23,7 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
             if sub.data.get("kind") != "floor_external":  # externer Fußbodenkreis: Komfort nur in den Zonen
                 new.append(Comfort(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0))))
             async_add_entities(new, config_subentry_id=sid)
-        elif sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower":
+        elif sub.subentry_type == SUB_ROOM and sub.data.get("role") not in ("follower", "passive"):
             async_add_entities([Comfort(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0)))], config_subentry_id=sid)
 
 

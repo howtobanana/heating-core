@@ -208,8 +208,7 @@
             "presence_sensors": "Präsenzsensoren",
             "schedule": "Eigener Zeitplan (sonst der des Heizkreises)",
             "window": "Fensterkontakt",
-            "temp_sensor": "Temperatursensor",
-            "pre_heat_entity": "Vorheizen-Helfer (optional)"
+            "temp_sensor": "Temperatursensor"
           },
           "description": "Geräte des Raums. Komfort stellst du danach am Regler, im Dashboard oder auf der Seite „Heizung“ ein; die Absenkung kommt vom Heizkreis.",
           "data_description": {
@@ -219,8 +218,7 @@
             "presence_sensors": "Präsenzmelder im Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
             "schedule": "Eigener Zeitplan nur für diesen Raum. Leer lassen = Zeitplan des Heizkreises.",
             "window": "Fensterkontakt im Raum. Offen länger als die Fenster-Verzögerung → Minimum.",
-            "temp_sensor": "Eigener Raumfühler. Genauer als der Fühler im Thermostat am Heizkörper.",
-            "pre_heat_entity": "Optional, z. B. für das Geofencing: Ist dieser Schalter an, heizt Heating Core vor wie mit dem Knopf „Vorheizen“, und schaltet ihn nach dem Zeitlimit oder sobald Präsenz/Zeitplan übernimmt wieder aus. Leer = nur der eigene Knopf."
+            "temp_sensor": "Eigener Raumfühler. Genauer als der Fühler im Thermostat am Heizkörper."
           }
         }
       },
@@ -249,7 +247,8 @@
       "options": {
         "isolated": "Eigener Raum (eigene Regelung)",
         "follower": "Folgt dem Master",
-        "floor_zone": "Fußboden-Zone (Ventil-Kanäle)"
+        "floor_zone": "Fußboden-Zone (Ventil-Kanäle)",
+        "passive": "Heizkörper ohne Thermostat (nur Anzeige)"
       }
     },
     "hvac_mode": {
@@ -301,7 +300,8 @@
           "source_cold": "Kessel zu kalt",
           "sensor_missing": "Sensor fehlt",
           "circuit_off": "Kreis von der Anlage abgeschaltet",
-          "disabled": "Ausgeschaltet"
+          "disabled": "Ausgeschaltet",
+          "passive": "Ohne Thermostat"
         }
       },
       "fuel": {

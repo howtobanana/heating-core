@@ -91,6 +91,7 @@ F_HVAC_MODE = "hvac_mode"  # Vaillant: gewünschte Betriebsart der Zone (heat_co
 # Fußboden extern (Sonderfall Perg)
 KIND_FLOOR_EXTERNAL = "floor_external"
 ROLE_FLOOR_ZONE = "floor_zone"
+ROLE_PASSIVE = "passive"  # Heizkörper ohne TRV: nur Anzeige im Schema, regelt nichts (HEATING-38)
 F_PUMP = "pump_switch"
 F_SOURCE_TEMP = "source_temp_sensor"
 F_SOURCE_ON = "source_on"
@@ -102,7 +103,7 @@ STARTUP_GUARD_S = 120
 USER_SETTLE_S = 30  # nach einer Eingabe an Reglern so lange warten, bevor geschrieben wird (Blueprint: Debounce 30 s)
 UPDATE_INTERVAL_S = 180
 
-MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing", "circuit_off", "disabled"]
+MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "window", "temperature_drop", "summer", "follower", "unavailable", "floor_heating", "floor_idle", "source_cold", "sensor_missing", "circuit_off", "disabled", "passive"]
 
 # Träger Kessel (Ökofen, HEATING-19, Fabian 09.11.2026): möglichst wenige Brennerstarts
 GENTLE_HOLD_S = 2 * 3600  # Mindesthaltezeit je Kreis nach einem Schreibvorgang (außer Ereignis)

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 import time
 
-from .const import SUB_CIRCUIT, SUB_ROOM
+from .const import DOMAIN, SUB_CIRCUIT, SUB_ROOM
 from .entity import HeatingEntity
 
 KEYS = ("away", "guest", "write_enabled")
@@ -19,9 +20,12 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     coordinator = entry.runtime_data
     async_add_entities(ControlSwitch(coordinator, key) for key in KEYS)
     for sid, sub in entry.subentries.items():
-        if sub.subentry_type == SUB_CIRCUIT or (sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower"):
+        if sub.subentry_type == SUB_ROOM:  # frühere Vorheizen-Schalter der Räume (bis 0.16.7) entfernen
+            reg = er.async_get(hass)
+            if old := reg.async_get_entity_id("switch", DOMAIN, f"{entry.entry_id}_{sid}_pre_heat"):
+                reg.async_remove(old)
+        if sub.subentry_type == SUB_CIRCUIT:  # Vorheizen nur je Heizkreis, die Räume heizen mit
             async_add_entities([PreHeatSwitch(coordinator, sid, sub.title)], config_subentry_id=sid)
-        if sub.subentry_type == SUB_CIRCUIT:
             async_add_entities([CircuitEnabledSwitch(coordinator, sid, sub.title)], config_subentry_id=sid)
 
 

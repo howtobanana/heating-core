@@ -23,7 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
         # wie beim Regler „Komfort“: Follower und externer Fußbodenkreis haben keinen eigenen Sollwert
         if sub.subentry_type == SUB_CIRCUIT and sub.data.get("kind") != "floor_external":
             async_add_entities([Thermostat(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0)), True)], config_subentry_id=sid)
-        elif sub.subentry_type == SUB_ROOM and sub.data.get("role") != "follower":
+        elif sub.subentry_type == SUB_ROOM and sub.data.get("role") not in ("follower", "passive"):
             async_add_entities([Thermostat(coordinator, sid, sub.title, float(sub.data.get(F_COMFORT, 21.0)), False)], config_subentry_id=sid)
 
 

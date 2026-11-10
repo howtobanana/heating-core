@@ -115,8 +115,9 @@ class HeatingCorePanel extends HTMLElement {
       const rooms = c.rooms.map((r) => {
         const rt = this._a(r.ent.target);
         const zone = rt.ventile_offen !== undefined && rt.ventile_offen !== null;
-        return { ent: r.ent, name: r.name, t: rt, zone, mode: this._st(r.ent.mode)?.state, soll: this._st(r.ent.target)?.state,
-          ist: rt.ist_temperatur, problem: rt.problem, flow: zone ? !!t.pumpe_ist && rt.ventile_offen : flow && rt.waermebedarf !== false };
+        const rmode = this._st(r.ent.mode)?.state, passive = rmode === "passive"; // Heizkörper ohne TRV: warm, wenn der Kreis fließt (HEATING-38)
+        return { ent: r.ent, name: r.name, t: rt, zone, passive, mode: rmode, soll: this._st(r.ent.target)?.state,
+          ist: rt.ist_temperatur, problem: rt.problem, flow: passive ? flow : zone ? !!t.pumpe_ist && rt.ventile_offen : flow && rt.waermebedarf !== false };
       });
       return { ent: c.ent, name: c.name, t, mode, soll, ist: t.ist_temperatur, floor, flow, rooms, problem: t.problem };
     });
@@ -284,9 +285,9 @@ class HeatingCorePanel extends HTMLElement {
       for (const z of r.rooms) {
         const d = narrow ? `M${L.branch} ${r.cy + 24}V${z.y - 8}Q${L.branch} ${z.y} ${L.branch + 8} ${z.y}H${L.room[0]}` : elbow(bx2, r.cy, L.branch, L.room[0], z.y);
         const [rx, rx2] = L.room;
-        const info2 = z.problem ? PROBLEMS[z.problem] || z.problem : `${fmt(z.ist)} → ${fmt(z.soll)} °C`;
-        const extra = z.zone ? (z.t.ventile_offen ? " · Ventil offen" : " · Ventil zu") : has(z.t.trv_sollwert) ? ` · TRV ${fmt(z.t.trv_sollwert)}` : "";
-        s += pipe(z.flow, false, HOT, d, true) + (z.zone ? I.valve : I.trv)(L.valve, z.y, z.flow);
+        const info2 = z.problem ? PROBLEMS[z.problem] || z.problem : z.passive ? (has(z.ist) ? `${fmt(z.ist)} °C` : "–") : `${fmt(z.ist)} → ${fmt(z.soll)} °C`;
+        const extra = z.passive ? " · ohne Thermostat" : z.zone ? (z.t.ventile_offen ? " · Ventil offen" : " · Ventil zu") : has(z.t.trv_sollwert) ? ` · TRV ${fmt(z.t.trv_sollwert)}` : "";
+        s += pipe(z.flow, false, HOT, d, true) + (z.passive ? "" : (z.zone ? I.valve : I.trv)(L.valve, z.y, z.flow));
         s += `<rect class="box ${z.flow ? "hot" : ""} ${z.problem ? "warnbox" : ""}" x="${rx}" y="${z.y - 21}" width="${rx2 - rx}" height="42" rx="10"/>
           ${z.zone ? I.floor(rx + 20, z.y, z.flow) : I.radiator(rx + 20, z.y, z.flow)}
           <text class="t sm" x="${rx + 40}" y="${z.y - 3}">${esc(z.name)}</text>
@@ -366,7 +367,7 @@ class HeatingCorePanel extends HTMLElement {
     } else {
       tiles.push(this._tile({ name: i.rooms.length ? "Ganzer Kreis" : i.name.replace(/^HK\d+\s*/, ""), ist: i.ist, soll: i.soll, mode: i.mode, problem: i.problem, ent: i.ent, iconSvg: icon(I.pump, i.flow) }));
     }
-    for (const z of i.rooms) {
+    for (const z of i.rooms.filter((r) => !r.passive)) { // passive Heizkörper nur im Schema, ohne Regler
       tiles.push(this._tile({ ...z, plan: z.t.zeitplan !== t.zeitplan ? z.t.zeitplan : null, seed: t.zeitplan, note: z.zone ? `Ventil ${z.t.ventile_offen ? "offen" : "zu"}` : has(z.t.trv_sollwert) && has(z.soll) && Math.abs(z.t.trv_sollwert - z.soll) > 0.1 ? `Thermostat steht noch auf ${fmt(z.t.trv_sollwert)}°` : "", iconSvg: icon(z.zone ? I.floor : I.radiator, z.flow) }));
     }
     return `<section class="group">
