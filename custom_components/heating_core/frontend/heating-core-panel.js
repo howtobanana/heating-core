@@ -457,7 +457,7 @@ class HeatingCorePanel extends HTMLElement {
 
 // ---- Zeitplan-Editor (HEATING-20) -------------------------------------------
 // Bearbeitet den HA-Zeitplan-Helfer direkt (schedule/list, schedule/update, schedule/create): HA bleibt die einzige Quelle.
-// Wochenraster Mo–So, Komfort-Blöcke ziehen (15 min), antippen zum Ändern/Löschen, Tag auf andere Tage kopieren.
+// Wochenraster Mo–So: Komfort-Blöcke anlegen, verschieben, am Rand ziehen (15 min), antippen für ±15 min/Löschen, Tag kopieren (HEATING-31).
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const DAY_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const STEP = 15; // Minuten
@@ -530,26 +530,28 @@ class HcScheduleEditor extends HTMLElement {
 
   _render() {
     const sel = this._sel;
+    const now = new Date(), today = (now.getDay() + 6) % 7, nowMin = now.getHours() * 60 + now.getMinutes();
     const rows = this._days.map((blocks, d) => `
       <div class="row">
         <span class="day">${DAY_DE[d]}</span>
         <div class="track" data-day="${d}">
           ${[6, 12, 18].map((h) => `<i class="tick" style="left:${(h / 24) * 100}%"></i>`).join("")}
+          ${d === today ? `<i class="now" style="left:${(nowMin / 1440) * 100}%" title="jetzt"></i>` : ""}
           ${blocks.map((b, k) => `<button class="blk ${sel && sel.d === d && sel.k === k ? "sel" : ""}" data-d="${d}" data-k="${k}"
               style="left:${(b.from / 1440) * 100}%;width:${((b.to - b.from) / 1440) * 100}%" aria-label="${DAY_DE[d]} ${hhmm(b.from)}–${hhmm(b.to)}">
-              <span>${hhmm(b.from)}–${hhmm(b.to)}</span></button>`).join("")}
+              <i class="h l" data-edge="from"></i><span>${hhmm(b.from)}–${hhmm(b.to)}</span><i class="h r" data-edge="to"></i></button>`).join("")}
         </div>
-        <button class="cp" data-copy="${d}" aria-label="${DAY_DE[d]} kopieren" title="Tag kopieren">⧉</button>
+        <button class="cp ${this._copy === d ? "on" : ""}" data-copy="${d}" aria-label="${DAY_DE[d]} kopieren" title="Tag kopieren">⧉</button>
       </div>
-      ${sel && sel.d === d ? this._editRow(blocks[sel.k]) : ""}
+      ${sel && sel.d === d && blocks[sel.k] ? this._editRow(blocks[sel.k]) : ""}
       ${this._copy === d ? this._copyRow(d) : ""}`).join("");
     this.shadowRoot.innerHTML = `<style>${EDITOR_CSS}</style>
       <div class="back"></div>
       <div class="dlg" role="dialog" aria-modal="true" aria-label="Zeitplan ${esc(this.name)}">
         <h2>Zeitplan ${esc(this.name)}</h2>
-        <p class="hint">Farbige Blöcke = Komfort, sonst Absenkung. Ziehen legt einen Block an, Antippen ändert ihn.</p>
+        <p class="hint">Farbige Blöcke = Komfort, sonst Absenkung. Auf freier Fläche ziehen legt einen Block an; Blöcke verschieben oder am Rand ziehen, antippen zum Feinstellen.</p>
         ${this._err ? `<div class="err">${esc(this._err)}</div>` : ""}
-        <div class="hours"><span></span><div>${[0, 6, 12, 18, 24].map((h) => `<b style="left:${(h / 24) * 100}%">${h}</b>`).join("")}</div><span></span></div>
+        <div class="hours"><span></span><div>${[0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => `<b style="left:${(h / 24) * 100}%">${h}</b>`).join("")}</div><span></span></div>
         ${rows}
         <div class="foot"><button class="ghost" data-act="cancel">Abbrechen</button>
           <button class="primary" data-act="save" ${this._busy ? "disabled" : ""}>${this._item ? "Speichern" : "Zeitplan anlegen"}</button></div>
@@ -558,68 +560,94 @@ class HcScheduleEditor extends HTMLElement {
     $("[data-act=cancel]").forEach((b) => b.addEventListener("click", () => this._close(false)));
     this.shadowRoot.querySelector(".back").addEventListener("click", () => this._close(false));
     $("[data-act=save]").forEach((b) => b.addEventListener("click", () => this._save()));
-    $(".blk").forEach((b) => b.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const d = Number(b.dataset.d), k = Number(b.dataset.k);
-      this._sel = sel && sel.d === d && sel.k === k ? null : { d, k };
-      this._copy = null;
-      this._render();
-    }));
+    // Maus/Finger laufen über _wireTrack; hier nur Tastatur (Enter/Leertaste, detail 0)
+    $(".blk").forEach((b) => b.addEventListener("click", (e) => { if (e.detail === 0) this._toggle(Number(b.dataset.d), Number(b.dataset.k)); }));
     $(".cp").forEach((b) => b.addEventListener("click", () => { this._copy = this._copy === Number(b.dataset.copy) ? null : Number(b.dataset.copy); this._sel = null; this._render(); }));
     $(".track").forEach((t) => this._wireTrack(t));
-    $("[data-edit]").forEach((inp) => inp.addEventListener("change", () => {
-      const b = this._days[sel.d][sel.k];
-      const v = inp.value ? toMin(inp.value) : 0;
-      if (inp.dataset.edit === "from") b.from = v; else b.to = v === 0 ? 1440 : v;
-      this._days[sel.d] = normalizeDay(this._days[sel.d]);
-      this._sel = null;
-      this._render();
+    $("[data-step]").forEach((btn) => btn.addEventListener("click", () => {
+      const b = { ...this._days[sel.d][sel.k] }, dv = Number(btn.dataset.dir) * STEP;
+      if (btn.dataset.step === "from") b.from = Math.max(0, Math.min(b.to - STEP, b.from + dv));
+      else b.to = Math.min(1440, Math.max(b.from + STEP, b.to + dv));
+      this._focus = `[data-step=${btn.dataset.step}][data-dir="${btn.dataset.dir}"]`;
+      this._commit(sel.d, sel.k, b);
     }));
     $("[data-act=del]").forEach((b) => b.addEventListener("click", () => { this._days[sel.d].splice(sel.k, 1); this._sel = null; this._render(); }));
-    $("[data-act=apply]").forEach((b) => b.addEventListener("click", () => {
+    $("[data-to]").forEach((b) => b.addEventListener("click", () => {
       const src = this._days[this._copy];
-      $("[data-to]:checked").forEach((c) => { this._days[Number(c.dataset.to)] = src.map((x) => ({ ...x })); });
+      b.dataset.to.split(",").map(Number).forEach((i) => { if (i !== this._copy) this._days[i] = src.map((x) => ({ ...x })); });
       this._copy = null;
       this._render();
     }));
+    if (this._focus) { this.shadowRoot.querySelector(this._focus)?.focus(); this._focus = null; }
+  }
+
+  _toggle(d, k) {
+    this._sel = this._sel && this._sel.d === d && this._sel.k === k ? null : { d, k };
+    this._copy = null;
+    this._render();
+  }
+
+  // Block k (-1 = neu) durch b ersetzen, zusammenlegen, den Ergebnis-Block ausgewählt lassen
+  _commit(d, k, b) {
+    this._days[d] = normalizeDay([...this._days[d].filter((_, i) => i !== k), b]);
+    const i = this._days[d].findIndex((x) => x.from <= b.from && b.from < x.to);
+    this._sel = i >= 0 ? { d, k: i } : null;
+    this._copy = null;
+    this._render();
   }
 
   _editRow(b) {
-    return `<div class="edit"><label>von <input type="time" step="900" data-edit="from" value="${hhmm(b.from)}"></label>
-      <label>bis <input type="time" step="900" data-edit="to" value="${b.to >= 1440 ? "00:00" : hhmm(b.to)}"></label>
+    const st = (edge, v) => `<span class="stp"><span class="lbl">${edge === "from" ? "Beginn" : "Ende"}</span>
+      <button class="rb" data-step="${edge}" data-dir="-1" aria-label="${edge === "from" ? "Beginn" : "Ende"} 15 min früher">−</button>
+      <b>${v}</b><button class="rb" data-step="${edge}" data-dir="1" aria-label="${edge === "from" ? "Beginn" : "Ende"} 15 min später">+</button></span>`;
+    return `<div class="edit">${st("from", hhmm(b.from))}${st("to", hhmm(b.to))}
       <button class="ghost danger" data-act="del">Löschen</button></div>`;
   }
 
   _copyRow(d) {
-    return `<div class="edit">Kopieren auf ${DAY_DE.map((n, i) => i === d ? "" : `<label class="ck"><input type="checkbox" data-to="${i}" ${(d < 5) === (i < 5) ? "checked" : ""}>${n}</label>`).join("")}
-      <button class="primary" data-act="apply">Übernehmen</button></div>`;
+    const t = [["Mo–Fr", "0,1,2,3,4"], ["Sa–So", "5,6"], ["alle Tage", "0,1,2,3,4,5,6"]];
+    return `<div class="edit">${DAY_DE[d]} kopieren auf ${t.map(([n, ids]) => `<button class="ghost" data-to="${ids}">${n}</button>`).join("")}</div>`;
   }
 
-  // Ziehen auf freier Fläche legt einen Komfort-Block an (15-min-Raster)
+  // Ziehen: freie Fläche = neuer Block, Rand = Beginn/Ende, Mitte = verschieben (15-min-Raster); ohne Bewegung = Antippen
   _wireTrack(track) {
     const d = Number(track.dataset.day);
     track.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".blk")) return;
+      if (e.button !== 0) return;
       e.preventDefault();
-      track.setPointerCapture(e.pointerId);
-      const start = this._minAt(track, e.clientX);
-      const ghost = document.createElement("div");
-      ghost.className = "blk ghostblk";
-      track.appendChild(ghost);
-      let end = start;
-      const draw = () => { const a = Math.min(start, end), b = Math.max(start, end); ghost.style.left = `${(a / 1440) * 100}%`; ghost.style.width = `${((b - a) / 1440) * 100}%`; ghost.textContent = b > a ? `${hhmm(a)}–${hhmm(b)}` : ""; };
-      const move = (ev) => { end = this._minAt(track, ev.clientX); draw(); };
+      const blk = e.target.closest(".blk");
+      const k = blk ? Number(blk.dataset.k) : -1;
+      const orig = blk ? { ...this._days[d][k] } : null;
+      const edge = e.target.closest(".h")?.dataset.edge || (blk ? "move" : "new");
+      const x0 = e.clientX, m0 = this._minAt(track, x0);
+      try { track.setPointerCapture(e.pointerId); } catch { /* synthetische Events im UI-Test */ }
+      const el = blk || Object.assign(document.createElement("div"), { className: "blk ghostblk", innerHTML: "<span></span>" });
+      const tip = Object.assign(document.createElement("div"), { className: "tip" });
+      let moved = false, cur = orig;
+      const move = (ev) => {
+        if (!moved && Math.abs(ev.clientX - x0) < 4) return;
+        if (!moved) { moved = true; if (!blk) track.appendChild(el); track.appendChild(tip); el.classList.add("drag"); }
+        const m = this._minAt(track, ev.clientX);
+        if (edge === "new") cur = { from: Math.min(m0, m), to: Math.max(m0, m) };
+        else if (edge === "from") cur = { from: Math.min(m, orig.to - STEP), to: orig.to };
+        else if (edge === "to") cur = { from: orig.from, to: Math.max(m, orig.from + STEP) };
+        else { const len = orig.to - orig.from, f = Math.max(0, Math.min(1440 - len, orig.from + m - m0)); cur = { from: f, to: f + len }; }
+        el.style.left = `${(cur.from / 1440) * 100}%`;
+        el.style.width = `${((cur.to - cur.from) / 1440) * 100}%`;
+        tip.style.left = `${((cur.from + cur.to) / 2880) * 100}%`;
+        tip.textContent = el.querySelector("span").textContent = `${hhmm(cur.from)}–${hhmm(cur.to)}`;
+      };
       const up = () => {
         track.removeEventListener("pointermove", move);
-        let a = Math.min(start, end), b = Math.max(start, end);
-        if (b - a < STEP) { a = Math.min(start, 1440 - 60); b = a + 60; } // Tippen: 1-h-Block
-        this._days[d] = normalizeDay([...this._days[d], { from: a, to: b }]);
-        this._sel = null;
-        this._render();
+        track.removeEventListener("pointerup", up);
+        track.removeEventListener("pointercancel", up);
+        if (!moved) return k >= 0 ? this._toggle(d, k) : (this._sel = null, this._copy = null, this._render());
+        if (cur.to - cur.from < STEP) return this._render();
+        this._commit(d, k, cur);
       };
       track.addEventListener("pointermove", move);
-      track.addEventListener("pointerup", up, { once: true });
-      draw();
+      track.addEventListener("pointerup", up);
+      track.addEventListener("pointercancel", up);
     });
   }
 }
@@ -635,21 +663,34 @@ const EDITOR_CSS = `
   .hours div { position: relative; height: 16px; font-size: 11px; color: var(--secondary-text-color); }
   .hours b { position: absolute; transform: translateX(-50%); font-weight: 400; } .hours b:first-child { transform: none; } .hours b:last-child { transform: translateX(-100%); }
   .day { font-size: 13px; font-weight: 600; }
-  .track { position: relative; height: 40px; background: ${COLD}18; border-radius: 10px; touch-action: none; cursor: crosshair; }
-  .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--divider-color); }
-  .blk { position: absolute; top: 3px; bottom: 3px; background: ${HOT}; color: #fff; border: 0; border-radius: 8px; padding: 0 4px; font: inherit; font-size: 11px;
-    overflow: hidden; white-space: nowrap; display: flex; align-items: center; justify-content: center; min-width: 4px; box-sizing: border-box; }
-  .blk.sel { outline: 3px solid var(--primary-color); outline-offset: 1px; } .ghostblk { opacity: .6; pointer-events: none; }
+  .track { position: relative; height: 40px; border-radius: 10px; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none;
+    background: repeating-linear-gradient(to right, transparent 0 calc(100% / 24 - 1px), var(--divider-color) calc(100% / 24 - 1px) calc(100% / 24)), ${COLD}18; }
+  .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--secondary-text-color); opacity: .45; }
+  .now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--primary-color); z-index: 1; pointer-events: none; }
+  .blk { position: absolute; top: 3px; bottom: 3px; background: ${HOT}; color: #fff; border: 0; border-radius: 8px; padding: 0; font: inherit; font-size: 11px;
+    display: flex; align-items: center; justify-content: center; min-width: 4px; box-sizing: border-box; cursor: grab; touch-action: none; }
+  .blk span { overflow: hidden; white-space: nowrap; text-overflow: clip; padding: 0 6px; pointer-events: none; }
+  .blk.sel { outline: 3px solid var(--primary-color); outline-offset: 1px; z-index: 1; } .blk.drag { opacity: .85; z-index: 2; cursor: grabbing; }
+  .ghostblk { opacity: .6; pointer-events: none; }
+  .h { position: absolute; top: -3px; bottom: -3px; width: 18px; cursor: ew-resize; z-index: 1; } .h.l { left: -9px; } .h.r { right: -9px; }
+  .h::after { content: ""; position: absolute; left: 7px; top: 30%; bottom: 30%; width: 4px; border-radius: 2px; background: #fff; opacity: 0; transition: opacity .15s; }
+  .blk:hover .h::after, .blk.sel .h::after, .blk.drag .h::after { opacity: .9; }
+  .tip { position: absolute; top: -26px; transform: translateX(-50%); background: var(--primary-text-color); color: var(--card-background-color);
+    font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; pointer-events: none; z-index: 3; }
   .cp { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font-size: 15px; }
-  .edit { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 2px 0 10px 36px; font-size: 13px; }
-  .edit input[type=time] { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); }
-  .ck { display: inline-flex; gap: 4px; align-items: center; }
+  .cp.on { border-color: var(--primary-color); color: var(--primary-color); }
+  .edit { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 2px 0 10px 36px; font-size: 13px; }
+  .stp { display: inline-flex; align-items: center; gap: 6px; } .lbl { color: var(--secondary-text-color); }
+  .stp b { min-width: 46px; text-align: center; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .rb { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font: inherit; font-size: 18px; line-height: 1; }
   .foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
   .primary, .ghost { border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; border: 1px solid var(--primary-color); }
+  .edit .ghost { padding: 6px 14px; font-size: 13px; }
   .primary { background: var(--primary-color); color: var(--text-primary-color, #fff); } .ghost { background: transparent; color: var(--primary-text-color); border-color: var(--divider-color); }
   .danger { color: #e53935; border-color: #e5393588; }
-  @media (max-width: 600px) { .blk span { display: none; } }
+  @media (max-width: 600px) { .blk span { display: none; } .track { height: 44px; } .edit { margin-left: 0; } }
   button:not(:disabled), label:has(input:not(:disabled)) { cursor: pointer; } :disabled { cursor: not-allowed; opacity: .6; }
+  .blk:not(:disabled) { cursor: grab; } .blk.drag { cursor: grabbing; }
 `;
 
 if (!customElements.get("hc-schedule-editor")) customElements.define("hc-schedule-editor", HcScheduleEditor);
