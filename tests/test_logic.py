@@ -33,6 +33,14 @@ def test_raum_ohne_bedarf_eco():
     assert (r.target, r.mode, r.active) == (19, "eco", False)
 
 
+def test_raum_absenkung_nie_ueber_komfort():
+    # Wien: Schlafzimmer Komfort 18, Absenkung 19 -> ohne Bedarf bleibt es bei 18 (HEATING-36)
+    r = room_target(G, room(comfort=18, current_setpoint=18, current_temp=19))
+    assert (r.target, r.mode) == (18, "eco")
+    r = room_target(G, room(comfort=18, window_closed_recently=True))
+    assert r.target == 18
+
+
 def test_raum_praesenz_heizt_auf_komfort():
     r = room_target(G, room(presence_on=True))
     assert (r.target, r.mode, r.needs_heat) == (21, "presence", True)

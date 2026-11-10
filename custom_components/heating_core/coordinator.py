@@ -60,6 +60,7 @@ from .const import (
     OPT_MIN_TRV,
     OPT_OUTDOOR_SENSOR,
     OPT_PRE_HEAT_TIMEOUT_MIN,
+    OPT_PRE_HEAT_LEAD,
     OPT_ROOM_DEMAND_DELTA,
     OPT_SUMMER_ENTITY,
     OPT_WEATHER_ENABLED,
@@ -71,7 +72,6 @@ from .const import (
     STARTUP_GUARD_S,
     GENTLE_HOLD_S,
     GENTLE_MIN_HYSTERESIS,
-    GENTLE_PRE_HEAT_LEAD_S,
     GENTLE_SHORT_SETBACK_S,
     SUB_CIRCUIT,
     SUB_ROOM,
@@ -363,7 +363,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._write_rooms(out, g, now)
             return out
         m_presence = self._presence(cid, ccfg.get(F_PRESENCE) or [], now)
-        m_schedule = self._gentle_schedule(ccfg.get(F_SCHEDULE), now) if lim.gentle else self._on(ccfg.get(F_SCHEDULE))
+        plan = self._gentle_schedule(ccfg.get(F_SCHEDULE), now) if lim.gentle else ("on" if self._on(ccfg.get(F_SCHEDULE)) else None)
+        m_schedule = plan is not None
         m_in = MasterInput(
             comfort=self._comfort(ccfg, cid),
             current_temp=current,
@@ -398,6 +399,11 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             out["problem"] = "room_sensor_blocks"
         out.update(target=m_res.target, state=m_res.state, set_now=state.setpoint, presence=m_presence, window_open=win.open_too_long, pump_on=state.pump_on,
                    current=current, budget_left=None, mode=_circuit_mode(m_res, m_in, g))
+        if plan in ("lead", "skip"):
+            # Komfort früher bzw. kurze Absenkung übersprungen: auf der Seite erklären (HEATING-30)
+            out["plan_hint"] = plan
+            if plan == "lead" and out["mode"] == "schedule":
+                out["mode"] = "pre_heat"
 
         for rid, rcfg in followers:
             t = follower_target(g, m_res.target_before_mods, float(rcfg.get(F_OFFSET, -2.0)), self._window(rcfg.get(F_WINDOW), now).open_too_long)
@@ -464,17 +470,23 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._last_message = info["message_time"]
         return info
 
-    def _gentle_schedule(self, entity_id: str | None, now: float) -> bool:
-        """Träger Kessel: Absenkphasen unter 3 h überspringen, Komfort 1 h vor dem Zeitplan (HEATING-19)."""
-        if not entity_id or self._on(entity_id):
-            return self._on(entity_id)
+    def _gentle_schedule(self, entity_id: str | None, now: float) -> str | None:
+        """Träger Kessel (HEATING-19): "on" = Zeitplan an, "lead" = Komfort vor dem Zeitplan (Vorlauf, Option),
+        "skip" = Absenkphase unter 3 h übersprungen, None = Absenkung."""
+        if not entity_id:
+            return None
+        if self._on(entity_id):
+            return "on"
         st = self.hass.states.get(entity_id)
         nxt = dt_util.parse_datetime(str(st.attributes.get("next_event"))) if st and st.attributes.get("next_event") else None
         if nxt is None:
-            return False
+            return None
         remaining = nxt.timestamp() - now
-        phase = nxt.timestamp() - st.last_changed.timestamp()
-        return 0 <= remaining <= GENTLE_PRE_HEAT_LEAD_S or 0 < phase < GENTLE_SHORT_SETBACK_S
+        if 0 <= remaining <= float(self.opt(OPT_PRE_HEAT_LEAD)) * 3600:
+            return "lead"
+        if 0 < nxt.timestamp() - st.last_changed.timestamp() < GENTLE_SHORT_SETBACK_S:
+            return "skip"
+        return None
 
     async def _summer(self, master_entity: str, ccfg: dict, g: Globals, now: float) -> None:
         """Vaillant: im Sommer Therme aus, danach Betriebsart zurück – nur, wenn Heating Core sie ausgeschaltet hat."""

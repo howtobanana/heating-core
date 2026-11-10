@@ -281,10 +281,17 @@ async def test_traeger_kessel_kurze_absenkung(hass: HomeAssistant) -> None:
     coordinator.control.setback["hk1"] = 18.0
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["target"] == 22.0  # 2-h-Lücke: bleibt auf Komfort
+    assert coordinator.data["circuits"]["hk1"]["plan_hint"] == "skip"  # Seite erklärt es (HEATING-30)
+    in_30m = (dt_util.now() + timedelta(minutes=30)).isoformat()
+    hass.states.async_set("schedule.hk1", "off", {"next_event": in_30m})
+    await coordinator.async_refresh()
+    hk1 = coordinator.data["circuits"]["hk1"]
+    assert (hk1["target"], hk1["plan_hint"], hk1["mode"]) == (22.0, "lead", "pre_heat")  # Vorlauf 1 h
     in_5h = (dt_util.now() + timedelta(hours=5)).isoformat()
     hass.states.async_set("schedule.hk1", "off", {"next_event": in_5h})
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["target"] == 18.0  # lange Absenkung bleibt
+    assert "plan_hint" not in coordinator.data["circuits"]["hk1"]
 
 
 async def test_zeitplan_zuordnen_per_websocket(hass: HomeAssistant, hass_ws_client) -> None:

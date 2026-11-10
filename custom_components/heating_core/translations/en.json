@@ -50,7 +50,8 @@
           "notify_devices": "Phones (mobile app)",
           "quiet_schedule": "Quiet time (schedule, no pushes)",
           "leitstand_expert": "Expert log (full details of every run as notification)",
-          "room_demand_delta": "Room requests heat from"
+          "room_demand_delta": "Room requests heat from",
+          "pre_heat_lead": "Start comfort earlier"
         },
         "description": "Applies to the whole system. Set comfort and setback per circuit or room on its slider or on the Heating page.",
         "data_description": {
@@ -81,7 +82,8 @@
           "notify_devices": "Phones with the Home Assistant app that receive pushes.",
           "quiet_schedule": "While this schedule is on (e.g. at night), no pushes are sent.",
           "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting.",
-          "room_demand_delta": "Ökofen only: a room raises the whole circuit only when it is this far below its comfort. Otherwise it heats via its own thermostat and the boiler keeps running calmly. 0 = every room may raise it at once."
+          "room_demand_delta": "Ökofen only: a room raises the whole circuit only when it is this far below its comfort. Otherwise it heats via its own thermostat and the boiler keeps running calmly. 0 = every room may raise it at once.",
+          "pre_heat_lead": "Ökofen only: comfort starts this many hours before the schedule because the boiler is slow. The Heating page then shows “Pre-heating for …”. 0 = schedule applies exactly."
         }
       }
     }

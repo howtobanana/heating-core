@@ -65,7 +65,8 @@ def room_base(g: Globals, r: RoomInput) -> tuple[float, bool]:
         return g.min_trv, active
     if g.away_effective and not pre_heat:
         return g.away_temp, active
-    return (r.comfort if active else g.eco), active
+    # Absenkung nie über dem Komfort des Raums (Wien: Schlafzimmer Komfort 18, Absenkung 19, HEATING-36)
+    return (r.comfort if active else min(g.eco, r.comfort)), active
 
 
 def room_target(g: Globals, r: RoomInput) -> RoomResult:
@@ -79,7 +80,7 @@ def room_target(g: Globals, r: RoomInput) -> RoomResult:
     elif active:
         base = r.comfort
     else:
-        base = g.eco
+        base = min(g.eco, r.comfort)  # Absenkung nie über dem Komfort (HEATING-36)
 
     if r.window_open_too_long:
         raw = g.min_trv
@@ -91,7 +92,7 @@ def room_target(g: Globals, r: RoomInput) -> RoomResult:
         else:
             raw = base if r.current_temp < base - g.hysteresis else g.eco
     elif r.window_closed_recently:
-        raw = base if active else (g.away_temp if g.away_effective else g.eco)
+        raw = base
     else:
         raw = base
 

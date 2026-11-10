@@ -65,6 +65,7 @@ class CircuitTarget(_Target):
             "pumpe_ist": d.get("pump_on"),
             "wuerde_schalten": d.get("would_switch"),
             "ist_temperatur": d.get("current"),
+            "zeitplan_hinweis": d.get("plan_hint"),
             "anlage": self.coordinator.entry.title,
             **self._plan(),
         }

@@ -212,8 +212,12 @@ class HeatingCorePanel extends HTMLElement {
     if (!id) return `<button class="plan add" ${attrs}>${seed ? "Eigener Zeitplan" : "Kein Zeitplan – Absenkung · anlegen"}</button>`;
     const st = this._st(id);
     const next = st?.attributes?.next_event ? new Date(st.attributes.next_event).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) : "";
-    return `<button class="plan ${st?.state === "on" ? "on" : ""}" ${attrs} title="Zeitplan bearbeiten">
-      Zeitplan ${st?.state === "on" ? "Komfort" : "Absenkung"}${next ? ` bis ${next}` : ""} ✎</button>`;
+    // Träger Kessel (HEATING-30): Komfort vor dem Zeitplan bzw. kurze Absenkung übersprungen – sagen, warum warm
+    const hint = this._st(target)?.attributes?.zeitplan_hinweis;
+    const text = hint === "lead" ? `Vorheizen für ${next} · Kessel schonen`
+      : hint === "skip" ? `Kurze Absenkung bis ${next} übersprungen · Kessel schonen`
+      : `Zeitplan ${st?.state === "on" ? "Komfort" : "Absenkung"}${next ? ` bis ${next}` : ""}`;
+    return `<button class="plan ${st?.state === "on" || hint ? "on" : ""}" ${attrs} title="Zeitplan bearbeiten">${text} ✎</button>`;
   }
 
   _openPlan(b) {

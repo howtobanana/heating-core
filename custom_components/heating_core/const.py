@@ -38,6 +38,7 @@ OPT_PUSH_ENABLED = "push_enabled"
 OPT_QUIET_SCHEDULE = "quiet_schedule"
 OPT_EXPERT = "leitstand_expert"
 OPT_ROOM_DEMAND_DELTA = "room_demand_delta"
+OPT_PRE_HEAT_LEAD = "pre_heat_lead"  # Stunden, Komfort so viel früher als der Zeitplan (nur Ökofen, HEATING-30)
 
 DEFAULTS = {
     OPT_ECO: 19.0,
@@ -64,6 +65,7 @@ DEFAULTS = {
     OPT_PUSH_ENABLED: True,
     OPT_EXPERT: False,
     OPT_ROOM_DEMAND_DELTA: 2.0,
+    OPT_PRE_HEAT_LEAD: 1.0,
 }
 
 # Felder in Heizkreis- und Raum-Subentries
@@ -101,4 +103,3 @@ MODES = ["eco", "presence", "schedule", "pre_heat", "manual", "boost", "away", "
 GENTLE_HOLD_S = 2 * 3600  # Mindesthaltezeit je Kreis nach einem Schreibvorgang (außer Ereignis)
 GENTLE_MIN_HYSTERESIS = 1.0  # °C, in beide Richtungen
 GENTLE_SHORT_SETBACK_S = 3 * 3600  # kürzere Absenkphasen im Zeitplan werden übersprungen
-GENTLE_PRE_HEAT_LEAD_S = 3600  # Komfort so viel früher als der Zeitplan beginnen

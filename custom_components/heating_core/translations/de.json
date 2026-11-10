@@ -50,7 +50,8 @@
           "notify_devices": "Handys (Mobile App)",
           "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)",
           "leitstand_expert": "Leitstand Expert (alle Details jedes Laufs als HA-Meldung)",
-          "room_demand_delta": "Raum fordert Wärme ab"
+          "room_demand_delta": "Raum fordert Wärme ab",
+          "pre_heat_lead": "Komfort früher beginnen"
         },
         "description": "Gilt für die ganze Anlage. Komfort und Absenkung stellst du je Heizkreis bzw. Raum am Regler oder auf der Seite „Heizung“ ein.",
         "data_description": {
@@ -81,7 +82,8 @@
           "notify_devices": "Handys mit der Home-Assistant-App, die Push-Nachrichten bekommen.",
           "quiet_schedule": "Solange dieser Zeitplan an ist (z. B. nachts), werden keine Push-Nachrichten verschickt.",
           "leitstand_expert": "Zeigt nach jedem Lauf alle Details (Soll, Ist, Entscheidung, Budget je Kreis und Raum) als HA-Meldung. Zur Fehlersuche, sonst aus.",
-          "room_demand_delta": "Nur Ökofen: Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt. Sonst heizt er nur über sein Thermostat, und der Kessel läuft ruhig weiter. 0 = jeder Raum darf sofort anheben."
+          "room_demand_delta": "Nur Ökofen: Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt. Sonst heizt er nur über sein Thermostat, und der Kessel läuft ruhig weiter. 0 = jeder Raum darf sofort anheben.",
+          "pre_heat_lead": "Nur Ökofen: So viele Stunden vor dem Zeitplan beginnt Komfort, weil der Kessel träge ist. Die Seite „Heizung“ zeigt dann „Vorheizen für …“. 0 = Zeitplan gilt genau."
         }
       }
     }
