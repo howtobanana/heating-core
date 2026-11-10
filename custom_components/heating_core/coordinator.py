@@ -63,6 +63,8 @@ from .const import (
     OPT_PRE_HEAT_LEAD,
     OPT_ROOM_DEMAND_DELTA,
     OPT_SUMMER_ENTITY,
+    OPT_SUMMER_LIMIT,
+    OPT_SUMMER_MEAN_SENSOR,
     OPT_WEATHER_ENABLED,
     OPT_WEATHER_ZONE1,
     OPT_WEATHER_ZONE2,
@@ -78,7 +80,7 @@ from .const import (
     UPDATE_INTERVAL_S,
 )
 from .floor import Zone, plan as floor_plan
-from .logic import Globals, MasterInput, RoomInput, follower_target, master_target, room_base, room_target
+from .logic import Globals, MasterInput, RoomInput, follower_target, master_target, room_base, room_target, summer_switch
 from .timing import Reading, presence, window
 from .writes import Decision, Write, WriteConfig, decide
 from . import trv as trv_tools
@@ -293,9 +295,10 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         now = time.time()
+        self._events = []
+        await self._auto_summer(now)
         g = self.globals()
         result: dict[str, Any] = {"globals": g, "circuits": {}}
-        self._events = []
         for cid, ccfg in self.circuits().items():
             result["circuits"][cid] = await self._circuit(cid, ccfg, g, now)
         # Brennstoff (nur Ökofen): aus dem ersten Heizkreis mit Master abgeleitet
@@ -471,6 +474,18 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._events.append(f"Kessel meldet: {info['message']}")
             self._last_message = info["message_time"]
         return info
+
+    async def _auto_summer(self, now: float) -> None:
+        """Sommer/Winter aus dem 72-h-Außenmittel am Sommer-Schalter (input_boolean) setzen, wie der Blueprint (HEATING-32).
+        Nur bei aktivem Schreiben: im Schattenbetrieb schaltet noch der Blueprint."""
+        switch_id = self.opt(OPT_SUMMER_ENTITY)
+        if not switch_id or not str(switch_id).startswith("input_boolean.") or not self.opt(OPT_SUMMER_MEAN_SENSOR):
+            return
+        want = summer_switch(self._on(switch_id), self._num(self.opt(OPT_SUMMER_MEAN_SENSOR)), float(self.opt(OPT_SUMMER_LIMIT)))
+        if want is None or not self.control.write_enabled or now - self._started < STARTUP_GUARD_S:
+            return
+        await self.hass.services.async_call("input_boolean", "turn_on" if want else "turn_off", {"entity_id": switch_id}, blocking=True)
+        self._events.append("Sommer erkannt – Heizung aus" if want else "Heizsaison erkannt – Heizung an")
 
     def _gentle_schedule(self, entity_id: str | None, now: float) -> str | None:
         """Träger Kessel (HEATING-19): "on" = Zeitplan an, "lead" = Komfort vor dem Zeitplan (Vorlauf, Option),

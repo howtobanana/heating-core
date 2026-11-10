@@ -22,6 +22,8 @@ OPT_WINDOW_SETTLE_S = "window_settle_s"
 OPT_AWAY_ENTITIES = "away_entities"
 OPT_GUEST_ENTITY = "guest_entity"
 OPT_SUMMER_ENTITY = "summer_entity"
+OPT_SUMMER_MEAN_SENSOR = "summer_mean_sensor"  # 72-h-Mittel der Außentemperatur (Statistik-Helfer, HEATING-32)
+OPT_SUMMER_LIMIT = "summer_limit"  # Heizgrenze, Sommer ab +1,5 °C, Winter unter −1,5 °C
 OPT_OUTDOOR_SENSOR = "outdoor_sensor"
 OPT_WEATHER_ENABLED = "weather_enabled"
 OPT_WEATHER_ZONE1 = "weather_zone1"
@@ -66,6 +68,7 @@ DEFAULTS = {
     OPT_EXPERT: False,
     OPT_ROOM_DEMAND_DELTA: 2.0,
     OPT_PRE_HEAT_LEAD: 1.0,
+    OPT_SUMMER_LIMIT: 15.0,
 }
 
 # Felder in Heizkreis- und Raum-Subentries

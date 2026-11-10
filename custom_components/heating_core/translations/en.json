@@ -51,7 +51,9 @@
           "quiet_schedule": "Quiet time (schedule, no pushes)",
           "leitstand_expert": "Expert log (full details of every run as notification)",
           "room_demand_delta": "Room requests heat from",
-          "pre_heat_lead": "Start comfort earlier"
+          "pre_heat_lead": "Start comfort earlier",
+          "summer_mean_sensor": "Outdoor temperature, 72 h mean (automatic summer)",
+          "summer_limit": "Heating limit"
         },
         "description": "Applies to the whole system. Set comfort and setback per circuit or room on its slider or on the Heating page.",
         "data_description": {
@@ -83,7 +85,9 @@
           "quiet_schedule": "While this schedule is on (e.g. at night), no pushes are sent.",
           "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting.",
           "room_demand_delta": "Ökofen only: a room raises the whole circuit only when it is this far below its comfort. Otherwise it heats via its own thermostat and the boiler keeps running calmly. 0 = every room may raise it at once.",
-          "pre_heat_lead": "Ökofen only: comfort starts this many hours before the schedule because the boiler is slow. The Heating page then shows “Pre-heating for …”. 0 = schedule applies exactly."
+          "pre_heat_lead": "Ökofen only: comfort starts this many hours before the schedule because the boiler is slow. The Heating page then shows “Pre-heating for …”. 0 = schedule applies exactly.",
+          "summer_mean_sensor": "Statistics helper with the rolling 72 h mean of the outdoor temperature. If set and the summer switch is an input_boolean, Heating Core switches summer itself – only while writing is on. Empty = summer only by hand.",
+          "summer_limit": "Summer from heating limit + 1.5 °C (72 h mean), heating season again below heating limit − 1.5 °C."
         }
       }
     }

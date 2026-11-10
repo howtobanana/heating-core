@@ -66,6 +66,8 @@ from .const import (
     OPT_QUIET_SCHEDULE,
     OPT_EXPERT,
     OPT_SUMMER_ENTITY,
+    OPT_SUMMER_LIMIT,
+    OPT_SUMMER_MEAN_SENSOR,
     OPT_WEATHER_ENABLED,
     OPT_WEATHER_ZONE1,
     OPT_WEATHER_ZONE2,
@@ -151,6 +153,8 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Optional(OPT_AWAY_ENTITIES, default=o[OPT_AWAY_ENTITIES]): _entity(["input_boolean", "binary_sensor", "switch"], multiple=True),
                 _opt(OPT_GUEST_ENTITY, o): _entity(["input_boolean", "binary_sensor", "switch"]),
                 _opt(OPT_SUMMER_ENTITY, o): _entity(["input_boolean", "binary_sensor"]),
+                _opt(OPT_SUMMER_MEAN_SENSOR, o): _entity("sensor"),
+                vol.Required(OPT_SUMMER_LIMIT, default=o[OPT_SUMMER_LIMIT]): _temp(10, 22),
                 _opt(OPT_OUTDOOR_SENSOR, o): _entity("sensor", device_class="temperature"),
                 vol.Required(OPT_WEATHER_ENABLED, default=o[OPT_WEATHER_ENABLED]): bool,
                 vol.Required(OPT_WEATHER_ZONE1, default=o[OPT_WEATHER_ZONE1]): _temp(0, 5),
@@ -183,7 +187,7 @@ def _common(d: dict, schedule: bool = True, window: bool = True, temp: bool = Tr
     """Gemeinsame optionale Felder: Präsenz, Zeitplan, Fenster, Temperatursensor."""
     out = {}
     if schedule:
-        out[_opt(F_PRESENCE, d)] = _entity("binary_sensor", multiple=True)
+        out[_opt(F_PRESENCE, d)] = _entity(["binary_sensor", "input_boolean"], multiple=True)  # Geofencing Wien: input_boolean.presence_* (HEATING-33)
         out[_opt(F_SCHEDULE, d)] = _entity("schedule")
     if window:
         out[_opt(F_WINDOW, d)] = _entity("binary_sensor")

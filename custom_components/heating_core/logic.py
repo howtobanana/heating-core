@@ -299,3 +299,15 @@ def master_target(
         weather_add=weather,
         humidity_drop=hum_drop,
     )
+
+
+def summer_switch(summer_on: bool, outdoor_mean: float | None, limit: float, band: float = 1.5) -> bool | None:
+    """Saison-Schalter wie der Vaillant-Blueprint (HEATING-32): Sommer ab Heizgrenze + 1,5 °C im 72-h-Mittel,
+    Winter unter Heizgrenze − 1,5 °C; dazwischen bleibt es, wie es ist. None = nichts zu tun."""
+    if outdoor_mean is None:
+        return None
+    if not summer_on and outdoor_mean >= limit + band:
+        return True
+    if summer_on and outdoor_mean < limit - band:
+        return False
+    return None

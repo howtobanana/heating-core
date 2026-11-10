@@ -199,3 +199,23 @@ async def test_trv_fehler_stoppt_andere_raeume_nicht(hass: HomeAssistant, states
     rooms = coordinator.data["circuits"]["kreis1"]["rooms"]
     assert rooms["raum1"]["problem"] == "room_write_failed"
     assert trv2 in written or [trv2] in written
+
+
+async def test_sommer_automatisch_aus_72h_mittel(hass: HomeAssistant, states) -> None:
+    """HEATING-32: Sommer-Schalter folgt dem 72-h-Mittel (Heizgrenze 17 ±1,5), aber nur bei aktivem Schreiben."""
+    hass.states.async_set("input_boolean.sommer", "off")
+    hass.states.async_set("sensor.aussen_72h", "19.0")
+    entry = _entry(summer_entity="input_boolean.sommer", summer_mean_sensor="sensor.aussen_72h", summer_limit=17.0)
+    coordinator = await _setup(hass, entry)
+    on = async_mock_service(hass, "input_boolean", "turn_on")
+    await coordinator.async_refresh()
+    assert not on  # Schattenbetrieb: der Blueprint schaltet
+    coordinator.control.write_enabled = True
+    with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
+        coordinator._started = 0
+        hass.states.async_set("sensor.aussen_72h", "18.0")  # im Band: nichts
+        await coordinator.async_refresh()
+        assert not on
+        hass.states.async_set("sensor.aussen_72h", "18.5")
+        await coordinator.async_refresh()
+    assert [c.data["entity_id"] for c in on] == ["input_boolean.sommer"]

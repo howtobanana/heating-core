@@ -7,6 +7,7 @@ from custom_components.heating_core.logic import (
     follower_target,
     master_target,
     room_target,
+    summer_switch,
 )
 
 # Werte wie in HA Wien (08.11.2026)
@@ -231,3 +232,12 @@ def test_raum_hebt_traegen_kreis_erst_ab_differenz():
     assert master_target(G, m, [(r_in, r_res)]).target == 22.8  # 1,4 °C zu kalt: nur der TRV heizt
     cold = RoomInput(comfort=24.5, current_temp=22.0, current_setpoint=24.5, schedule_on=True)
     assert master_target(G, m, [(cold, room_target(G, cold))]).target == 24.5  # 2,5 °C zu kalt: Raum fordert an
+
+
+def test_sommer_schalter_mit_band():
+    # Blueprint: Sommer ab Heizgrenze + 1,5, Winter unter Heizgrenze − 1,5, dazwischen bleibt es (HEATING-32)
+    assert summer_switch(False, 18.5, 17) is True
+    assert summer_switch(False, 18.4, 17) is None
+    assert summer_switch(True, 15.6, 17) is None
+    assert summer_switch(True, 15.4, 17) is False
+    assert summer_switch(True, None, 17) is None
