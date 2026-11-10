@@ -26,6 +26,17 @@ Fehlt eine Einstellung im Menü, liegt sie in der Fachmann-Ebene (Code beim Inst
 Zeitpläne, Absenkung, Abwesend, Fenster und „Heizkreis aus“ kommen aus Heating Core,
 nicht aus der Pellematic.
 
+## Wenn Home Assistant ausfällt
+
+Heating Core schreibt nur, solange Home Assistant läuft. Fällt es aus, bleibt an der Anlage
+der zuletzt geschriebene Zustand stehen (HEATING-35):
+
+| Anlage | Was passiert | Rückfall |
+|---|---|---|
+| Ökofen (Perg) | Der Kreis bleibt auf „heizen“ bzw. „absenken“ mit dem letzten Offset. Die Heizkurve der Pellematic regelt weiter nach der Außentemperatur, Frostschutz bleibt aktiv. | Kein eigener Rückfall nötig: Schlimmstenfalls bleibt es zu warm (Komfort) oder kühler (Absenkung), aber nie kalt. Wer sofort das Zeitprogramm der Pellematic will: am Display Betriebsart „Auto“. |
+| Vaillant, Handbetrieb `heat_cool` (Wien heute) | Der letzte Sollwert bleibt dauerhaft stehen, z. B. 25 °C nach einem Boost oder 17 °C bei Abwesend. | **Betriebsart „auto“ (Zeitprogramm) im Formular des Kreises wählen.** Dann schreibt Heating Core ein Quick-Veto mit begrenzter Dauer und erneuert es laufend; fällt Home Assistant aus, endet das Quick-Veto nach höchstens der in myVaillant eingestellten Dauer, und die Therme folgt wieder ihrem Zeitprogramm (Wien: 19 °C von 6:00 bis 23:50). |
+| TRVs | Behalten den letzten Sollwert, regeln aber mit ihrem eigenen Fühler weiter. | – |
+
 ## Stand
 Perg (Ökofen) wird von Heating Core gesteuert, Wien (Vaillant) läuft im Schattenbetrieb.
 Privat, bis beides stabil läuft (HEATING-7).
