@@ -11,9 +11,9 @@ const MODES = {
   disabled: "Ausgeschaltet",
 };
 const DECISIONS = {
-  startup: "Startschutz nach Neustart", no_setpoint: "Anlage meldet keinen Sollwert",
+  startup: "Wartet kurz nach dem Neustart", no_setpoint: "Anlage meldet keinen Sollwert",
   pending_confirmation: "Warte auf Bestätigung der Anlage", no_delta: "Passt – nichts zu tun",
-  within_hysteresis: "Abweichung zu klein", budget: "Schreib-Budget erschöpft",
+  within_hysteresis: "Passt – Abweichung zu klein", budget: "Schreib-Budget erschöpft",
   hold_drop: "Sperrzeit nach Erhöhen", hold_raise: "Sperrzeit nach Absenken", hold_min: "Kessel schonen: Haltezeit 2 h",
   raise: "Würde erhöhen", drop: "Würde absenken", significant_drop: "Würde deutlich absenken",
   forced_min: "Sicherheit: Minimum", renew: "Würde erneuern", circuit_off: "Kreis aus – nicht übersteuert", disabled: "Kreis ausgeschaltet – nur Frostschutz",
@@ -362,7 +362,8 @@ class HeatingCorePanel extends HTMLElement {
     const t = i.t;
     const meta = i.floor
       ? `Kessel ${fmt(t.kessel_temperatur, 0)} °C · Freigabe ${t.kessel_freigabe ? "ja" : "nein"}`
-      : `Anlage meldet ${fmt(t.anlage_sollwert)} °C · ${DECISIONS[t.entscheidung] || t.entscheidung || ""}${has(t.schreib_budget_rest) ? ` · Budget ${t.schreib_budget_rest}` : ""}`;
+      // Budget nur, wo es eins gibt (Vaillant-Cloud); Ökofen hat keins
+      : `Anlage steht auf ${fmt(t.anlage_sollwert)} °C · ${DECISIONS[t.entscheidung] || t.entscheidung || ""}${has(t.schreib_budget) ? ` · noch ${t.schreib_budget_rest} von ${t.schreib_budget} Schreibvorgängen` : ""}`;
     const would = (t.wuerde_schalten || []).map((w) => esc(w.replace("switch.", ""))).join(", ");
     const tiles = [];
     if (i.floor) {
@@ -781,8 +782,16 @@ const CSS = `
   .stepper { display:flex; align-items:center; gap: 10px; margin-top: 6px; font-size: 12px; color: var(--secondary-text-color); }
   .stepper span { display:flex; flex-direction:column; align-items:center; min-width: 56px; } .stepper b { font-size: 15px; color: var(--primary-text-color); }
   .stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); font-size: 18px; line-height: 1; }
-  .gctl { display:flex; flex-wrap:wrap; align-items:center; gap: 8px 16px; margin: 0 4px 12px; }
-  .gctl .plan, .gctl .mini { margin-top: 0; }
+  /* Bedienleiste je Heizkreis: Zeitplan | Absenkung | Ausschalten als gleich hohe Felder (Fabian 11.11.2026) */
+  .gctl { display:inline-flex; flex-wrap:wrap; align-items:stretch; gap: 4px; padding: 4px; margin: 0 0 12px; background: var(--secondary-background-color); border-radius: 14px; max-width: 100%; box-sizing: border-box; }
+  .gctl > * { margin: 0; min-height: 38px; box-sizing: border-box; display:flex; align-items:center; gap: 8px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--card-background-color); color: var(--primary-text-color); font-size: 13px; }
+  .gctl > * { flex: 1 1 auto; } .gctl .mini { justify-content: space-between; }
+  .gctl .plan, .gctl .plan.on, .gctl .chip { border-radius: 10px; padding: 0 12px; font-size: 13px; background: var(--card-background-color); }
+  .gctl .plan::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: ${IDLE}; flex: none; }
+  .gctl .plan.on::before { background: ${HOT}; } .gctl .plan.add::before { display: none; }
+  .gctl .plan.add { border: 1px dashed var(--divider-color); color: var(--secondary-text-color); }
+  .gctl .mini span { color: var(--secondary-text-color); } .gctl .mini b { min-width: 40px; display:inline-block; text-align:center; }
+  .gctl .chip { color: var(--secondary-text-color); }
   .mini { display:flex; align-items:center; gap: 8px; font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
   .mini button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--divider-color); background: transparent; color: var(--primary-text-color); font-size: 14px; line-height: 1; }
   .mini b { color: var(--primary-text-color); }
