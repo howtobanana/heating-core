@@ -47,7 +47,8 @@ async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
     from pytest_homeassistant_custom_component.common import MockConfigEntry
     from custom_components.heating_core.const import DOMAIN
 
-    entry = MockConfigEntry(domain=DOMAIN, title="P", unique_id="p", data={"name": "P", "manufacturer": "oekofen"})
+    entry = MockConfigEntry(domain=DOMAIN, title="P", unique_id="p", data={"name": "P", "manufacturer": "oekofen"},
+                            options={"hysteresis": 0.8, "away_temp": 15.0})
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -55,9 +56,14 @@ async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
     assert result["type"] == "form"
     defaults = {k.schema: k.default() for k in result["data_schema"].schema if callable(getattr(k, "default", None))}
     assert "weather_enabled" not in defaults and "weather_zone1" not in defaults  # Ökofen: Heizkurve kompensiert selbst
+    # nur Festes im Formular: Regler-Werte und das Vaillant-Budget nicht (Fabian, 11.11.2026)
+    keys = {str(k) for k in result["data_schema"].schema}
+    assert not keys & {"eco_temp", "away_temp", "hysteresis", "budget_per_hour", "presence_activation_min",
+                       "presence_deactivation_min", "window_delay_s", "window_settle_s", "pre_heat_timeout_min"}
     result = await hass.config_entries.options.async_configure(result["flow_id"], {**defaults, "boost_enabled": False})
     assert result["type"] == "create_entry"
     assert entry.options["boost_enabled"] is False
+    assert entry.options["hysteresis"] == 0.8 and entry.options["away_temp"] == 15.0  # bleiben erhalten
 
 
 async def test_raum_zwei_schritte_und_feld_leeren(hass: HomeAssistant) -> None:

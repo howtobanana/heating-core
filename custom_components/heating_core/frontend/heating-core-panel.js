@@ -29,7 +29,11 @@ const HEATING = new Set(["presence", "schedule", "pre_heat", "manual", "boost", 
 const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable", "disabled"]);
 const HOT = "#f4511e", COLD = "#1e88e5", IDLE = "#9aa5b1", WARN = "#f5a623";
 
-const val = (v, unit) => (unit === "min" ? `${Math.round(Number(v))} min` : `${fmt(v)} °C`); // Regler-Anzeige
+const val = (v, unit) => { // Regler-Anzeige
+  const n = Number(v);
+  if (unit === "s") return n >= 60 && n % 60 === 0 ? `${n / 60} min` : `${Math.round(n)} s`;
+  return unit === "min" ? `${Math.round(n)} min` : `${fmt(v)} °C`;
+};
 const has = (v) => v !== null && v !== undefined && v !== "" && !isNaN(Number(v));
 const fmt = (v, d = 1) => (has(v) ? Number(v).toLocaleString("de-AT", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -157,7 +161,7 @@ class HeatingCorePanel extends HTMLElement {
   _slider(id, label) {
     const st = this._st(id);
     if (!st) return "";
-    const a = st.attributes, unit = a.unit_of_measurement === "min" ? "min" : "°C";
+    const a = st.attributes, unit = ["min", "s"].includes(a.unit_of_measurement) ? a.unit_of_measurement : "°C";
     return `<label class="slider"><span>${esc(label)}</span>
       <input type="range" data-number="${id}" data-unit="${unit}" min="${a.min}" max="${a.max}" step="${a.step}" value="${st.state}">
       <b data-out="${id}">${val(st.state, unit)}</b></label>`;
@@ -400,7 +404,9 @@ class HeatingCorePanel extends HTMLElement {
       <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel), sys.model)}${this._kessel(this._a(s.fuel).kessel)}${this._legend()}</section>
       ${info.map((i) => this._circuitGroup(i)).join("")}
       <section class="card"><h2>Grundwerte</h2>${this._slider(s.away_temp, "Abwesend")}
-        ${this._slider(s.presence_on_min, "Präsenz an nach")}${this._slider(s.presence_off_min, "Präsenz aus nach")}</section>
+        ${this._slider(s.presence_on_min, "Präsenz an nach")}${this._slider(s.presence_off_min, "Präsenz aus nach")}
+        ${this._slider(s.hysteresis, "Hysterese")}${this._slider(s.window_delay_s, "Fenster offen ab")}
+        ${this._slider(s.window_settle_s, "Nach Fenster zu warten")}${this._slider(s.pre_heat_timeout_min, "Vorheizen höchstens")}</section>
     </div>`;
   }
 

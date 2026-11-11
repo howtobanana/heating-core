@@ -133,6 +133,7 @@ class ControlState:
     away_temp: float | None = None  # Regler „Abwesend“ der Anlage
     presence_on_min: float | None = None  # Regler „Präsenz an nach“ (min), sonst Optionen
     presence_off_min: float | None = None  # Regler „Präsenz aus nach“ (min), sonst Optionen
+    tuning: dict[str, float] = field(default_factory=dict)  # Regler „Grundwerte“ (Hysterese, Fenster, Vorheizen) vor den Optionen
     write_events: dict[str, tuple] = field(default_factory=dict)  # Kreis -> Ereignislage beim letzten Write (HEATING-19)
 
 
@@ -161,6 +162,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ---- Konfiguration -----------------------------------------------------
 
     def opt(self, key: str) -> Any:
+        if key in self.control.tuning:
+            return self.control.tuning[key]
         return self.entry.options.get(key, DEFAULTS.get(key))
 
     def circuits(self) -> dict[str, dict]:

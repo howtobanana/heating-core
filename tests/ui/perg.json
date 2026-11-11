@@ -334,5 +334,71 @@
   },
   "device": "HK3 Fußboden",
   "key": "setback"
+ },
+ "number.perg_presence_on_after": {
+  "state": "2.0",
+  "attributes": {
+   "min": 0,
+   "max": 60,
+   "step": 1,
+   "unit_of_measurement": "min"
+  },
+  "device": "Perg",
+  "key": "presence_on_min"
+ },
+ "number.perg_presence_off_after": {
+  "state": "30.0",
+  "attributes": {
+   "min": 0,
+   "max": 240,
+   "step": 1,
+   "unit_of_measurement": "min"
+  },
+  "device": "Perg",
+  "key": "presence_off_min"
+ },
+ "number.perg_hysteresis": {
+  "state": "0.6",
+  "attributes": {
+   "min": 0.1,
+   "max": 2,
+   "step": 0.1,
+   "unit_of_measurement": "°C"
+  },
+  "device": "Perg",
+  "key": "hysteresis"
+ },
+ "number.perg_window_open_after": {
+  "state": "30.0",
+  "attributes": {
+   "min": 10,
+   "max": 600,
+   "step": 10,
+   "unit_of_measurement": "s"
+  },
+  "device": "Perg",
+  "key": "window_delay_s"
+ },
+ "number.perg_wait_after_window_closed": {
+  "state": "180.0",
+  "attributes": {
+   "min": 0,
+   "max": 1800,
+   "step": 30,
+   "unit_of_measurement": "s"
+  },
+  "device": "Perg",
+  "key": "window_settle_s"
+ },
+ "number.perg_pre_heat_at_most": {
+  "state": "90.0",
+  "attributes": {
+   "min": 15,
+   "max": 480,
+   "step": 15,
+   "unit_of_measurement": "min"
+  },
+  "device": "Perg",
+  "key": "pre_heat_timeout_min"
  }
 }

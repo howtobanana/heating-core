@@ -349,6 +349,18 @@
       },
       "presence_off_min": {
         "name": "Presence off after"
+      },
+      "hysteresis": {
+        "name": "Hysteresis"
+      },
+      "window_delay_s": {
+        "name": "Window open after"
+      },
+      "window_settle_s": {
+        "name": "Wait after window closed"
+      },
+      "pre_heat_timeout_min": {
+        "name": "Pre-heat at most"
       }
     }
   },

@@ -45,7 +45,6 @@ from .const import (
     F_TEMP,
     F_WINDOW,
     MANUFACTURERS,
-    OPT_ACTIVATION_MIN,
     OPT_AWAY_ENTITIES,
     OPT_BATTERY_MIN,
     OPT_BRIEFING_TIME,
@@ -53,22 +52,17 @@ from .const import (
     OPT_ERROR_ENTITY,
     OPT_PRESSURE_MIN,
     OPT_PRESSURE_SENSOR,
-    OPT_AWAY_TEMP,
     OPT_BOOST_AMOUNT,
     OPT_BOOST_ENABLED,
     OPT_BOOST_THRESHOLD,
     OPT_BUDGET,
-    OPT_DEACTIVATION_MIN,
-    OPT_ECO,
     OPT_PRE_HEAT_LEAD,
     OPT_ROOM_DEMAND_DELTA,
     OPT_GUEST_ENTITY,
     OPT_HUMIDITY_DROP,
     OPT_HUMIDITY_ENABLED,
-    OPT_HYSTERESIS,
     OPT_MIN_TRV,
     OPT_OUTDOOR_SENSOR,
-    OPT_PRE_HEAT_TIMEOUT_MIN,
     OPT_NOTIFY_DEVICES,
     OPT_PUSH_ENABLED,
     OPT_QUIET_SCHEDULE,
@@ -80,8 +74,6 @@ from .const import (
     OPT_WEATHER_ZONE1,
     OPT_WEATHER_ZONE2,
     OPT_WEATHER_ZONE3,
-    OPT_WINDOW_DELAY_S,
-    OPT_WINDOW_SETTLE_S,
     SUB_CIRCUIT,
     SUB_ROOM,
 )
@@ -143,21 +135,19 @@ class HeatingOptionsFlow(OptionsFlow):
     """Globale Werte der Anlage."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        schema = self._schema()
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            # Werte, die nicht (mehr) im Formular stehen (jetzt Regler), behalten; Formularfelder nur aus der Eingabe,
+            # damit geleerte optionale Felder weg sind
+            keep = {k: v for k, v in self.config_entry.options.items() if k not in {str(m) for m in schema.schema}}
+            return self.async_create_entry(data={**keep, **user_input})
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+    def _schema(self) -> vol.Schema:
         o = {**DEFAULTS, **self.config_entry.options}
         schema = vol.Schema(
             {
-                vol.Required(OPT_ECO, default=o[OPT_ECO]): _temp(15, 23),
-                vol.Required(OPT_AWAY_TEMP, default=o[OPT_AWAY_TEMP]): _temp(10, 20),
                 vol.Required(OPT_MIN_TRV, default=o[OPT_MIN_TRV]): _temp(5, 15),
-                vol.Required(OPT_HYSTERESIS, default=o[OPT_HYSTERESIS]): _temp(0.1, 2, 0.1),
-                vol.Required(OPT_BUDGET, default=o[OPT_BUDGET]): _num(5, 20),
-                vol.Required(OPT_ACTIVATION_MIN, default=o[OPT_ACTIVATION_MIN]): _num(0, 30, 1, "min"),
-                vol.Required(OPT_DEACTIVATION_MIN, default=o[OPT_DEACTIVATION_MIN]): _num(5, 240, 5, "min"),
-                vol.Required(OPT_WINDOW_DELAY_S, default=o[OPT_WINDOW_DELAY_S]): _num(10, 600, 5, "s"),
-                vol.Required(OPT_WINDOW_SETTLE_S, default=o[OPT_WINDOW_SETTLE_S]): _num(0, 1800, 10, "s"),
-                vol.Required(OPT_PRE_HEAT_TIMEOUT_MIN, default=o[OPT_PRE_HEAT_TIMEOUT_MIN]): _num(15, 480, 15, "min"),
                 vol.Optional(OPT_AWAY_ENTITIES, default=o[OPT_AWAY_ENTITIES]): _entity(["input_boolean", "binary_sensor", "switch"], multiple=True),
                 _opt(OPT_GUEST_ENTITY, o): _entity(["input_boolean", "binary_sensor", "switch"]),
                 _opt(OPT_SUMMER_ENTITY, o): _entity(["input_boolean", "binary_sensor"]),
@@ -187,6 +177,7 @@ class HeatingOptionsFlow(OptionsFlow):
         if self.config_entry.data.get(CONF_MANUFACTURER) != "oekofen":
             # Gebäude-Kompensation nur ohne eigene Heizkurve; bei Ökofen kompensiert die Pellematic selbst (HEATING-21)
             schema = schema.extend({
+                vol.Required(OPT_BUDGET, default=o[OPT_BUDGET]): _num(5, 20),  # Cloud-Limit, nur Vaillant
                 vol.Required(OPT_WEATHER_ENABLED, default=o[OPT_WEATHER_ENABLED]): bool,
                 vol.Required(OPT_WEATHER_ZONE1, default=o[OPT_WEATHER_ZONE1]): _temp(0, 5),
                 vol.Required(OPT_WEATHER_ZONE2, default=o[OPT_WEATHER_ZONE2]): _temp(0, 5),
@@ -200,7 +191,7 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Required(OPT_ROOM_DEMAND_DELTA, default=o[OPT_ROOM_DEMAND_DELTA]): _temp(0, 5, 0.5),
                 vol.Required(OPT_PRE_HEAT_LEAD, default=o[OPT_PRE_HEAT_LEAD]): _num(0, 3, 0.5, "h"),
             })
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return schema
 
 
 def _common(d: dict, schedule: bool = True, window: bool = True, temp: bool = True) -> dict:

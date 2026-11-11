@@ -7,7 +7,8 @@ from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEFAULTS, F_COMFORT, OPT_ACTIVATION_MIN, OPT_AWAY_TEMP, OPT_DEACTIVATION_MIN, OPT_ECO, SUB_CIRCUIT, SUB_ROOM
+from .const import (DEFAULTS, F_COMFORT, OPT_ACTIVATION_MIN, OPT_AWAY_TEMP, OPT_DEACTIVATION_MIN, OPT_ECO, OPT_HYSTERESIS,
+                    OPT_PRE_HEAT_TIMEOUT_MIN, OPT_WINDOW_DELAY_S, OPT_WINDOW_SETTLE_S, SUB_CIRCUIT, SUB_ROOM)
 from .entity import HeatingEntity
 
 
@@ -15,7 +16,12 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     coordinator = entry.runtime_data
     async_add_entities([GlobalTemp(coordinator, "eco"), GlobalTemp(coordinator, "away_temp"),
                         PresenceDelay(coordinator, "presence_on_min", OPT_ACTIVATION_MIN, 60),
-                        PresenceDelay(coordinator, "presence_off_min", OPT_DEACTIVATION_MIN, 240)])
+                        PresenceDelay(coordinator, "presence_off_min", OPT_DEACTIVATION_MIN, 240),
+                        # Werte, die man hin und wieder umstellt: Regler statt Einstellungen (Fabian, 11.11.2026)
+                        Tuning(coordinator, OPT_HYSTERESIS, 0.1, 2.0, 0.1, UnitOfTemperature.CELSIUS),
+                        Tuning(coordinator, OPT_WINDOW_DELAY_S, 10, 600, 10, UnitOfTime.SECONDS),
+                        Tuning(coordinator, OPT_WINDOW_SETTLE_S, 0, 1800, 30, UnitOfTime.SECONDS),
+                        Tuning(coordinator, OPT_PRE_HEAT_TIMEOUT_MIN, 15, 480, 15, UnitOfTime.MINUTES)])
     for sid, sub in entry.subentries.items():
         if sub.subentry_type == SUB_CIRCUIT:
             # Absenkung gibt es je Heizkreis (Fabian, 08.11.2026), Räume erben sie; Abwesend bleibt global
@@ -137,3 +143,21 @@ class PresenceDelay(_Temp):
     @property
     def native_value(self) -> float:
         return self.coordinator.presence_delay(self._opt)
+
+
+class Tuning(_Temp):
+    """Anlagenweiter Wert als Regler; ohne eigenen Wert gilt der aus den Optionen (alte Installationen)."""
+
+    def __init__(self, coordinator, key: str, lo: float, hi: float, step: float, unit: str) -> None:
+        super().__init__(coordinator, key)
+        self._key = key
+        self._attr_translation_key = key
+        self._attr_native_min_value, self._attr_native_max_value, self._attr_native_step = lo, hi, step
+        self._attr_native_unit_of_measurement = unit
+
+    def _store(self, value: float) -> None:
+        self.coordinator.control.tuning[self._key] = value
+
+    @property
+    def native_value(self) -> float:
+        return float(self.coordinator.opt(self._key))

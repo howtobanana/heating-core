@@ -349,6 +349,18 @@
       },
       "presence_off_min": {
         "name": "Präsenz aus nach"
+      },
+      "hysteresis": {
+        "name": "Hysterese"
+      },
+      "window_delay_s": {
+        "name": "Fenster offen ab"
+      },
+      "window_settle_s": {
+        "name": "Nach Fenster zu warten"
+      },
+      "pre_heat_timeout_min": {
+        "name": "Vorheizen höchstens"
       }
     }
   },

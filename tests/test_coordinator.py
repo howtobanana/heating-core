@@ -320,3 +320,12 @@ async def test_heizkoerper_ohne_trv_nur_anzeige(hass: HomeAssistant, states) -> 
     assert hass.states.get("climate.flur") is None and hass.states.get("number.flur_comfort") is None
     assert hass.states.get("sensor.flur_mode").state == "passive"
     assert float(_sensor(hass, "kreis_setpoint").state) == 22.0  # Kreis regelt unverändert
+
+
+async def test_grundwerte_regler_vor_optionen(hass: HomeAssistant, states) -> None:
+    """Hysterese, Fenster und Vorheizen als Regler (Fabian, 11.11.2026); ohne Reglerwert gilt die Option."""
+    coordinator = await _setup(hass, _entry(window_delay_s=45))
+    assert hass.states.get("number.test_window_open_after").state == "45.0"
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.test_hysteresis", "value": 1.2}, blocking=True)
+    assert coordinator.opt("hysteresis") == 1.2 and coordinator.globals().hysteresis == 1.2
+    assert float(hass.states.get("number.test_pre_heat_at_most").state) == 90
