@@ -540,7 +540,9 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         remaining = nxt.timestamp() - now
         if 0 <= remaining <= float(self.opt(OPT_PRE_HEAT_LEAD)) * 3600:
             return "lead"
-        if 0 < nxt.timestamp() - st.last_changed.timestamp() < GENTLE_SHORT_SETBACK_S:
+        # Nur überspringen, wenn Heating Core den Wechsel auf „aus“ selbst gesehen hat: nach einem HA-Neustart steht
+        # last_changed auf dem Neustart, und eine lange Nachtabsenkung sähe sonst kurz aus (HEATING-39)
+        if 0 < nxt.timestamp() - st.last_changed.timestamp() < GENTLE_SHORT_SETBACK_S and st.last_changed.timestamp() > self._started:
             return "skip"
         return None
 
