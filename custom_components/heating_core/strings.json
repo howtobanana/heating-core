@@ -190,11 +190,11 @@
             "circuit": "Heating circuit",
             "role": "Role"
           },
-          "description": "A room belongs to a heating circuit and has either its own thermostat (TRV) or valve channels of a floor heating.",
+          "description": "A room belongs to a heating circuit and has its own thermostat (TRV), valve channels of a floor heating or only radiators without thermostat.",
           "data_description": {
             "name": "Name of the room, e.g. “Office upstairs”.",
             "circuit": "The circuit the radiator or floor zone is connected to.",
-            "role": "Own room: TRV with its own control, raises the circuit if needed. Follows master: TRV takes the circuit's setpoint plus offset. Floor zone: valve channels of a floor circuit."
+            "role": "Own room: TRV with its own control, raises the circuit if needed. Follows master: TRV takes the circuit's setpoint plus offset. Floor zone: valve channels of a floor circuit. Radiator without thermostat: only connected to the circuit, warms up with it and shows in the system diagram – controls nothing."
           }
         },
         "reconfigure": {

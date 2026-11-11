@@ -190,11 +190,11 @@
             "circuit": "Heizkreis",
             "role": "Rolle"
           },
-          "description": "Ein Raum hängt an einem Heizkreis und hat entweder einen eigenen Thermostat (TRV) oder Ventil-Kanäle einer Fußbodenheizung.",
+          "description": "Ein Raum hängt an einem Heizkreis und hat einen eigenen Thermostat (TRV), Ventil-Kanäle einer Fußbodenheizung oder nur Heizkörper ohne Thermostat.",
           "data_description": {
             "name": "Wie der Raum heißt, z. B. „Büro OG“.",
             "circuit": "Der Heizkreis, an dem der Heizkörper bzw. die Fußbodenzone hängt.",
-            "role": "Eigener Raum: TRV mit eigener Regelung, hebt bei Bedarf den Heizkreis an. Folgt dem Master: TRV übernimmt den Sollwert des Heizkreises plus Abstand. Fußboden-Zone: Ventil-Kanäle eines Fußbodenkreises."
+            "role": "Eigener Raum: TRV mit eigener Regelung, hebt bei Bedarf den Heizkreis an. Folgt dem Master: TRV übernimmt den Sollwert des Heizkreises plus Abstand. Fußboden-Zone: Ventil-Kanäle eines Fußbodenkreises. Heizkörper ohne Thermostat: hängt nur am Heizkreis, wird mit ihm warm und erscheint im Anlagenschema – regelt nichts."
           }
         },
         "reconfigure": {
