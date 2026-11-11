@@ -789,7 +789,7 @@ const CSS = `
   .gctl > * { margin: 0; min-height: 38px; box-sizing: border-box; display:flex; align-items:center; gap: 8px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--card-background-color); color: var(--primary-text-color); font-size: 13px; }
   .plan .edit { opacity: .55; flex: none; margin-left: 2px; vertical-align: -2px; }
   .gctl > * { flex: 1 1 auto; } .gctl .mini { justify-content: space-between; }
-  .gctl .plan, .gctl .plan.on, .gctl .chip { border-radius: 10px; padding: 0 12px; font-size: 13px; background: var(--card-background-color); }
+  .gctl .plan, .gctl .plan.on, .gctl .chip, .gctl .mini { margin: 0; border-radius: 10px; padding: 0 12px; font-size: 13px; background: var(--card-background-color); }
   .gctl .plan::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: ${IDLE}; flex: none; }
   .gctl .plan.on::before { background: ${HOT}; } .gctl .plan.add::before { display: none; }
   .gctl .plan.add { border: 1px dashed var(--divider-color); color: var(--secondary-text-color); }
