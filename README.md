@@ -26,6 +26,17 @@ Fehlt eine Einstellung im Menü, liegt sie in der Fachmann-Ebene (Code beim Inst
 Zeitpläne, Absenkung, Abwesend, Fenster und „Heizkreis aus“ kommen aus Heating Core,
 nicht aus der Pellematic.
 
+## System-Diagnose
+
+Heating Core meldet, greift aber nie ein (HEATING-41, ersetzt die Automation „(Vaillant) System-Diagnose“).
+Alles erscheint in der Problem-Meldung in HA und als Push (Einstellungen der Anlage → Handys, Ruhezeit):
+
+- Batterie schwach (Standard unter 20 %) bei allen Geräten, die Heating Core benutzt – gefunden über die Geräte der eingetragenen Entitäten, nichts extra einzutragen
+- Fühler, Fensterkontakte, Ventile usw. länger als 15 min nicht erreichbar (Thermostate und Kessel meldet die Regelung schon sofort)
+- Störcode der Therme (nur Vaillant; Ökofen meldet über die Kesseldiagnose)
+- Wasserdruck: Warnung bis 0,2 bar über der Grenze, Alarm darunter
+- Tägliches Briefing zur eingestellten Uhrzeit (Druck, Effizienz, Erreichbarkeit, Pellets, offene Probleme), pausiert im Sommer
+
 ## Wenn Home Assistant ausfällt
 
 Heating Core schreibt nur, solange Home Assistant läuft. Fällt es aus, bleibt an der Anlage

@@ -15,7 +15,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util, slugify
 
-from .const import OPT_EXPERT, OPT_NOTIFY_DEVICES, OPT_PUSH_ENABLED, OPT_QUIET_SCHEDULE
+from .const import DEFAULTS, OPT_BRIEFING_TIME, OPT_EXPERT, OPT_NOTIFY_DEVICES, OPT_PUSH_ENABLED, OPT_QUIET_SCHEDULE
+from .diagnose import briefing
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ def collect_problems(data: dict) -> list[str]:
     if boiler.get("diagnosis") in DIAGNOSIS_TEXT:
         out.append(DIAGNOSIS_TEXT[boiler["diagnosis"]] + (f": {boiler['diagnosis_text']}" if boiler.get("diagnosis_text") else ""))
     out += [f"🟠 Kessel meldet: {m}" for m in boiler.get("messages_active") or []]
+    out += (data or {}).get("health") or []  # System-Diagnose (HEATING-41)
     return out
 
 
@@ -92,9 +94,10 @@ class Notifier:
         self.hass, self.entry = hass, entry
         self._shown: list[str] = []
         self._alert_id = f"heating_core_{entry.entry_id}_problem"
+        self._briefed = None  # Datum des letzten Briefings
 
     def _opt(self, key, default=None):
-        return self.entry.options.get(key, default)
+        return self.entry.options.get(key, DEFAULTS.get(key, default))
 
     def _targets(self) -> list[str]:
         """notify.mobile_app_<gerät> wie im Blueprint (Gerätename → Service-Name)."""
@@ -111,18 +114,32 @@ class Notifier:
         st = self.hass.states.get(sched) if sched else None
         return bool(st and st.state == "on")
 
-    async def push(self, title: str, message: str) -> None:
+    async def push(self, title: str, message: str, tag: str = "") -> None:
         if not self._opt(OPT_PUSH_ENABLED, True) or self._quiet():
             return
         for service in self._targets():
             try:
                 await self.hass.services.async_call(
                     "notify", service,
-                    {"title": title, "message": message, "data": {"tag": f"heating_core_{self.entry.entry_id}"}},
+                    {"title": title, "message": message, "data": {"tag": f"heating_core_{self.entry.entry_id}{tag}"}},
                     blocking=True,
                 )
             except (HomeAssistantError, ValueError) as err:
                 _LOGGER.warning("Push an notify.%s fehlgeschlagen: %s", service, err)
+
+    async def _briefing(self, data: dict, problems: list[str]) -> None:
+        """Tägliches System-Briefing zur eingestellten Zeit; im Sommer Pause wie im Blueprint (HEATING-41)."""
+        at = self._opt(OPT_BRIEFING_TIME)
+        g = (data or {}).get("globals")
+        if not at or (g is not None and g.summer):
+            return
+        now = dt_util.now()
+        start = now.replace(**dict(zip(("hour", "minute", "second"), map(int, str(at).split(":")[:3]))), microsecond=0)
+        # shortcut: Fenster 30 min, damit ein Neustart am Abend nicht nachträglich briefed; Neustart im Fenster kann doppeln
+        if self._briefed == now.date() or not 0 <= (now - start).total_seconds() < 1800:
+            return
+        self._briefed = now.date()
+        await self.push(f"📊 Heizung {self.entry.title} – Briefing", briefing(self.hass, data, problems, self._opt), "_briefing")
 
     async def update(self, data: dict, events: list[str], ready: bool) -> None:
         """Nach jedem Lauf: Problem-Meldung pflegen, Schreibvorgänge und neue Probleme pushen."""
@@ -146,6 +163,7 @@ class Notifier:
                 await self.push(title, "\n".join(new))
         if events:
             await self.push(f"🔥 Heizung {self.entry.title}", "\n".join(events))
+        await self._briefing(data, problems)
         if self._opt(OPT_EXPERT, False):
             await self.hass.services.async_call(
                 "persistent_notification", "create",

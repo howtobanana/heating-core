@@ -40,6 +40,13 @@ OPT_PUSH_ENABLED = "push_enabled"
 OPT_QUIET_SCHEDULE = "quiet_schedule"
 OPT_EXPERT = "leitstand_expert"
 OPT_ROOM_DEMAND_DELTA = "room_demand_delta"
+# System-Diagnose (HEATING-41)
+OPT_ERROR_ENTITY = "error_entity"  # Störcode der Therme (nur ohne eigene Kesseldiagnose, also nicht Ökofen)
+OPT_PRESSURE_SENSOR = "pressure_sensor"
+OPT_PRESSURE_MIN = "pressure_min"  # bar, kritisch; Warnung 0,2 bar darüber
+OPT_EFFICIENCY_SENSOR = "efficiency_sensor"  # nur fürs Briefing
+OPT_BATTERY_MIN = "battery_min"  # %
+OPT_BRIEFING_TIME = "briefing_time"  # leer = kein tägliches Briefing
 OPT_PRE_HEAT_LEAD = "pre_heat_lead"  # Stunden, Komfort so viel früher als der Zeitplan (nur Ökofen, HEATING-30)
 
 DEFAULTS = {
@@ -69,6 +76,8 @@ DEFAULTS = {
     OPT_ROOM_DEMAND_DELTA: 2.0,
     OPT_PRE_HEAT_LEAD: 1.0,
     OPT_SUMMER_LIMIT: 15.0,
+    OPT_PRESSURE_MIN: 1.0,
+    OPT_BATTERY_MIN: 20,
 }
 
 # Felder in Heizkreis- und Raum-Subentries

@@ -47,6 +47,12 @@ from .const import (
     MANUFACTURERS,
     OPT_ACTIVATION_MIN,
     OPT_AWAY_ENTITIES,
+    OPT_BATTERY_MIN,
+    OPT_BRIEFING_TIME,
+    OPT_EFFICIENCY_SENSOR,
+    OPT_ERROR_ENTITY,
+    OPT_PRESSURE_MIN,
+    OPT_PRESSURE_SENSOR,
     OPT_AWAY_TEMP,
     OPT_BOOST_AMOUNT,
     OPT_BOOST_ENABLED,
@@ -170,6 +176,12 @@ class HeatingOptionsFlow(OptionsFlow):
                 ),
                 _opt(OPT_QUIET_SCHEDULE, o): _entity("schedule"),
                 vol.Required(OPT_EXPERT, default=o[OPT_EXPERT]): bool,
+                # System-Diagnose (HEATING-41): meldet nur
+                vol.Required(OPT_BATTERY_MIN, default=o[OPT_BATTERY_MIN]): _num(5, 50, 1, "%"),
+                _opt(OPT_PRESSURE_SENSOR, o): _entity("sensor", device_class="pressure"),
+                vol.Required(OPT_PRESSURE_MIN, default=o[OPT_PRESSURE_MIN]): _num(0.5, 3, 0.1, "bar"),
+                _opt(OPT_EFFICIENCY_SENSOR, o): _entity("sensor"),
+                _opt(OPT_BRIEFING_TIME, o): sel.TimeSelector(),
             }
         )
         if self.config_entry.data.get(CONF_MANUFACTURER) != "oekofen":
@@ -179,6 +191,8 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Required(OPT_WEATHER_ZONE1, default=o[OPT_WEATHER_ZONE1]): _temp(0, 5),
                 vol.Required(OPT_WEATHER_ZONE2, default=o[OPT_WEATHER_ZONE2]): _temp(0, 5),
                 vol.Required(OPT_WEATHER_ZONE3, default=o[OPT_WEATHER_ZONE3]): _temp(0, 5),
+                # Störcode: Ökofen hat die Kesseldiagnose schon (HEATING-21)
+                _opt(OPT_ERROR_ENTITY, o): _entity(["binary_sensor", "sensor"]),
             })
         if self.config_entry.data.get(CONF_MANUFACTURER) == "oekofen":
             # träger Kessel: Räume heben den Kreis erst ab dieser Differenz zum Komfort (HEATING-19)

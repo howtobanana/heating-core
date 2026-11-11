@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .adapters import get_adapter
+from .diagnose import health
 from .notify import Notifier
 from .const import (
     CONF_MANUFACTURER,
@@ -47,6 +48,8 @@ from .const import (
     F_TEMP,
     F_WINDOW,
     OPT_ACTIVATION_MIN,
+    OPT_ERROR_ENTITY,
+    OPT_PRESSURE_SENSOR,
     OPT_AWAY_ENTITIES,
     OPT_AWAY_TEMP,
     OPT_BOOST_AMOUNT,
@@ -336,6 +339,8 @@ class HeatingCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         masters = [c[F_MASTER] for c in self.circuits().values() if c.get(F_MASTER)]
         result["fuel_kg"], result["fuel_max_kg"] = fuel(masters[0]) if fuel and masters else (None, None)
         result["boiler"] = self._boiler(masters[0] if masters else None)
+        result["health"] = health(self.hass, self.watched_entities() | {e for e in (self.opt(OPT_PRESSURE_SENSOR), self.opt(OPT_ERROR_ENTITY)) if e},
+                                  self.opt, now)
         try:
             await self.notifier.update(result, self._events, ready=now - self._started >= STARTUP_GUARD_S)
         except (HomeAssistantError, ValueError) as err:  # Meldungen dürfen die Regelung nie stoppen

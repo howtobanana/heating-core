@@ -53,7 +53,13 @@
           "room_demand_delta": "Raum fordert Wärme ab",
           "pre_heat_lead": "Komfort früher beginnen",
           "summer_mean_sensor": "Außentemperatur, Mittel 72 h (Sommer automatisch)",
-          "summer_limit": "Heizgrenze"
+          "summer_limit": "Heizgrenze",
+          "battery_min": "Batterie-Warnung unter",
+          "pressure_sensor": "Wasserdruck",
+          "pressure_min": "Wasserdruck kritisch unter",
+          "efficiency_sensor": "Effizienz (fürs Briefing)",
+          "briefing_time": "Tägliches Briefing um",
+          "error_entity": "Störcode der Therme"
         },
         "description": "Gilt für die ganze Anlage. Komfort und Absenkung stellst du je Heizkreis bzw. Raum am Regler oder auf der Seite „Heizung“ ein.",
         "data_description": {
@@ -87,7 +93,13 @@
           "room_demand_delta": "Nur Ökofen: Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt. Sonst heizt er nur über sein Thermostat, und der Kessel läuft ruhig weiter. 0 = jeder Raum darf sofort anheben.",
           "pre_heat_lead": "Nur Ökofen: So viele Stunden vor dem Zeitplan beginnt Komfort, weil der Kessel träge ist. Die Seite „Heizung“ zeigt dann „Vorheizen für …“. 0 = Zeitplan gilt genau.",
           "summer_mean_sensor": "Statistik-Helfer mit dem gleitenden 72-h-Mittel der Außentemperatur. Ist er gesetzt und der Sommer-Schalter ein input_boolean, schaltet Heating Core den Sommer selbst – nur wenn Schreiben an ist. Leer = Sommer nur von Hand.",
-          "summer_limit": "Sommer ab Heizgrenze + 1,5 °C im 72-h-Mittel, Heizsaison wieder unter Heizgrenze − 1,5 °C."
+          "summer_limit": "Sommer ab Heizgrenze + 1,5 °C im 72-h-Mittel, Heizsaison wieder unter Heizgrenze − 1,5 °C.",
+          "battery_min": "Meldet schwache Batterien aller Geräte, die Heating Core benutzt (Thermostate, Fühler, Fensterkontakte) – automatisch über ihre Geräte, ohne Eintragen.",
+          "pressure_sensor": "Anlagendruck in bar. Leer lassen, wenn die Anlage keinen meldet.",
+          "pressure_min": "Darunter kommt ein Alarm „sofort nachfüllen“, bis 0,2 bar darüber eine Warnung „bald nachfüllen“.",
+          "efficiency_sensor": "Z. B. COP/Wirkungsgrad oder ein Statistik-Helfer mit dem 7-Tage-Mittel. Erscheint nur im täglichen Briefing.",
+          "briefing_time": "Push mit Druck, Effizienz, Erreichbarkeit, Pellets und offenen Problemen. Leer = kein Briefing. Im Sommer pausiert es.",
+          "error_entity": "Z. B. binary_sensor.…_trouble_codes. Meldet eine Störung sofort per Problem-Meldung und Push."
         }
       }
     }

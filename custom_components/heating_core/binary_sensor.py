@@ -50,7 +50,7 @@ class Problem(HeatingEntity, BinarySensorEntity):
             for r in c.get("rooms", {}).values():
                 if r.get("problem"):
                     out.append(f"{r.get('name')}: {r['problem']}")
-        return out
+        return out + ((self.coordinator.data or {}).get("health") or [])
 
     @property
     def is_on(self) -> bool:

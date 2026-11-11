@@ -53,7 +53,13 @@
           "room_demand_delta": "Room requests heat from",
           "pre_heat_lead": "Start comfort earlier",
           "summer_mean_sensor": "Outdoor temperature, 72 h mean (automatic summer)",
-          "summer_limit": "Heating limit"
+          "summer_limit": "Heating limit",
+          "battery_min": "Battery warning below",
+          "pressure_sensor": "Water pressure",
+          "pressure_min": "Water pressure critical below",
+          "efficiency_sensor": "Efficiency (for the briefing)",
+          "briefing_time": "Daily briefing at",
+          "error_entity": "Boiler fault code"
         },
         "description": "Applies to the whole system. Set comfort and setback per circuit or room on its slider or on the Heating page.",
         "data_description": {
@@ -87,7 +93,13 @@
           "room_demand_delta": "Ökofen only: a room raises the whole circuit only when it is this far below its comfort. Otherwise it heats via its own thermostat and the boiler keeps running calmly. 0 = every room may raise it at once.",
           "pre_heat_lead": "Ökofen only: comfort starts this many hours before the schedule because the boiler is slow. The Heating page then shows “Pre-heating for …”. 0 = schedule applies exactly.",
           "summer_mean_sensor": "Statistics helper with the rolling 72 h mean of the outdoor temperature. If set and the summer switch is an input_boolean, Heating Core switches summer itself – only while writing is on. Empty = summer only by hand.",
-          "summer_limit": "Summer from heating limit + 1.5 °C (72 h mean), heating season again below heating limit − 1.5 °C."
+          "summer_limit": "Summer from heating limit + 1.5 °C (72 h mean), heating season again below heating limit − 1.5 °C.",
+          "battery_min": "Reports weak batteries of every device Heating Core uses (thermostats, sensors, window contacts), found automatically via their devices.",
+          "pressure_sensor": "System pressure in bar. Leave empty if the system does not report it.",
+          "pressure_min": "Below this an alarm “refill now”, up to 0.2 bar above a warning “refill soon”.",
+          "efficiency_sensor": "E.g. COP/efficiency or a statistics helper with the 7-day mean. Only shown in the daily briefing.",
+          "briefing_time": "Push with pressure, efficiency, reachability, pellets and open problems. Empty = no briefing. Paused in summer.",
+          "error_entity": "E.g. binary_sensor.…_trouble_codes. Reports a fault right away via the problem notification and push."
         }
       }
     }
