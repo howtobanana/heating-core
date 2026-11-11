@@ -50,4 +50,6 @@ der zuletzt geschriebene Zustand stehen (HEATING-35):
 
 ## Stand
 Perg (Ökofen) wird von Heating Core gesteuert, Wien (Vaillant) läuft im Schattenbetrieb.
-Privat, bis beides stabil läuft (HEATING-7).
+Öffentlich seit 11.11.2026, noch in Erprobung – Einrichtung über HACS als benutzerdefiniertes Repository.
+
+Passend dazu (herstellerunabhängig): [common-blueprints](https://github.com/howtobanana/common-blueprints) mit Geofencing (Abwesend, Vorheizen beim Heimweg) und Lüftungs-Steuerung.
