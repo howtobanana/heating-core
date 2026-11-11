@@ -51,7 +51,8 @@
           "pressure_min": "Water pressure critical below",
           "efficiency_sensor": "Efficiency (for the briefing)",
           "briefing_time": "Daily briefing at",
-          "error_entity": "Boiler fault code"
+          "error_entity": "Boiler fault code",
+          "device_health": "Check batteries and reachability"
         },
         "description": "Applies to the whole system. Set comfort and setback per circuit or room on the “Heizung” page.\n\n{hint}",
         "data_description": {
@@ -83,7 +84,8 @@
           "pressure_min": "Below this an alarm “refill now”, up to 0.2 bar above a warning “refill soon”.",
           "efficiency_sensor": "E.g. COP/efficiency or a statistics helper with the 7-day mean. Only shown in the daily briefing.",
           "briefing_time": "Push with pressure, efficiency, reachability, pellets and open problems. Empty = no briefing. Paused in summer.",
-          "error_entity": "E.g. binary_sensor.…_trouble_codes. Reports a fault right away via the problem notification and push."
+          "error_entity": "E.g. binary_sensor.…_trouble_codes. Reports a fault right away via the problem notification and push.",
+          "device_health": "Reports weak batteries and devices unreachable for more than 15 min – only devices Heating Core uses. Turn off if an automation of your own already does this for the whole home, otherwise every message arrives twice."
         }
       }
     }

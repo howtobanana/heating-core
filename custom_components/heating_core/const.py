@@ -45,6 +45,7 @@ OPT_ERROR_ENTITY = "error_entity"  # Störcode der Therme (nur ohne eigene Kesse
 OPT_PRESSURE_SENSOR = "pressure_sensor"
 OPT_PRESSURE_MIN = "pressure_min"  # bar, kritisch; Warnung 0,2 bar darüber
 OPT_EFFICIENCY_SENSOR = "efficiency_sensor"  # nur fürs Briefing
+OPT_DEVICE_HEALTH = "device_health"  # Batterien/Erreichbarkeit prüfen; aus, wenn eine eigene Geräte-Automation das fürs ganze Haus macht (Wien)
 OPT_BATTERY_MIN = "battery_min"  # %
 OPT_BRIEFING_TIME = "briefing_time"  # leer = kein tägliches Briefing
 OPT_PRE_HEAT_LEAD = "pre_heat_lead"  # Stunden, Komfort so viel früher als der Zeitplan (nur Ökofen, HEATING-30)
@@ -78,6 +79,7 @@ DEFAULTS = {
     OPT_SUMMER_LIMIT: 15.0,
     OPT_PRESSURE_MIN: 1.0,
     OPT_BATTERY_MIN: 20,
+    OPT_DEVICE_HEALTH: True,
 }
 
 # Felder in Heizkreis- und Raum-Subentries

@@ -11,7 +11,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .const import OPT_BATTERY_MIN, OPT_EFFICIENCY_SENSOR, OPT_ERROR_ENTITY, OPT_PRESSURE_MIN, OPT_PRESSURE_SENSOR
+from .const import OPT_BATTERY_MIN, OPT_DEVICE_HEALTH, OPT_EFFICIENCY_SENSOR, OPT_ERROR_ENTITY, OPT_PRESSURE_MIN, OPT_PRESSURE_SENSOR
 
 OFFLINE_S = 15 * 60  # wie der Blueprint: erst nach 15 min melden, Funk-Aussetzer bleiben still
 PRESSURE_WARN_BAND = 0.2  # Warnstufe liegt 0,2 bar über der kritischen Grenze (Blueprint)
@@ -35,7 +35,7 @@ def health(hass: HomeAssistant, entities: set[str], opt, now: float) -> list[str
     out: list[str] = []
     reg = er.async_get(hass)
     devices: set[str] = set()
-    for eid in sorted(entities):
+    for eid in sorted(entities) if opt(OPT_DEVICE_HEALTH) else []:
         ent = reg.async_get(eid)
         if ent and ent.device_id:
             devices.add(ent.device_id)

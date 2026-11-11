@@ -110,9 +110,11 @@ async def test_fuehler_offline_erst_nach_15_min(hass: HomeAssistant, states) -> 
     from custom_components.heating_core.diagnose import health
 
     hass.states.async_set("sensor.fuehler", "unavailable", {"friendly_name": "Fühler Büro"})
-    opt = {"battery_min": 20, "pressure_min": 1.0}.get
+    opt = {"battery_min": 20, "pressure_min": 1.0, "device_health": True}.get
     assert health(hass, {"sensor.fuehler"}, opt, time.time()) == []
     assert health(hass, {"sensor.fuehler"}, opt, time.time() + 16 * 60) == ["📡 Seit über 15 min nicht erreichbar: Fühler Büro"]
+    off = {"battery_min": 20, "pressure_min": 1.0, "device_health": False}.get  # Wien: eigene Geräte-Automation
+    assert health(hass, {"sensor.fuehler"}, off, time.time() + 16 * 60) == []
 
 
 async def test_briefing_einmal_am_tag_nicht_im_sommer(hass: HomeAssistant, states) -> None:

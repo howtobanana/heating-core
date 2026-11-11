@@ -47,6 +47,7 @@ from .const import (
     MANUFACTURERS,
     OPT_AWAY_ENTITIES,
     OPT_BATTERY_MIN,
+    OPT_DEVICE_HEALTH,
     OPT_BRIEFING_TIME,
     OPT_EFFICIENCY_SENSOR,
     OPT_ERROR_ENTITY,
@@ -195,6 +196,7 @@ class HeatingOptionsFlow(OptionsFlow):
                 _opt(OPT_QUIET_SCHEDULE, o): _entity("schedule"),
                 vol.Required(OPT_EXPERT, default=o[OPT_EXPERT]): bool,
                 # System-Diagnose (HEATING-41): meldet nur
+                vol.Required(OPT_DEVICE_HEALTH, default=o[OPT_DEVICE_HEALTH]): bool,
                 vol.Required(OPT_BATTERY_MIN, default=o[OPT_BATTERY_MIN]): _num(5, 50, 1, "%"),
                 _opt(OPT_PRESSURE_SENSOR, o): _entity("sensor", device_class="pressure"),
                 vol.Required(OPT_PRESSURE_MIN, default=o[OPT_PRESSURE_MIN]): _num(0.5, 3, 0.1, "bar"),
