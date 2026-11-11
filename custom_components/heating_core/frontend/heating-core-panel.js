@@ -48,6 +48,8 @@ const I = {
   floor: (x, y, on) => `<g class="rad ${on ? "on" : ""}" transform="translate(${x} ${y})"><path d="M-10-7H7a2.5 2.5 0 0 1 0 5H-7a2.5 2.5 0 0 0 0 5H7a2.5 2.5 0 0 1 0 5H-10"/></g>`,
   warn: (x, y) => `<g transform="translate(${x} ${y})"><path fill="${WARN}" d="M0-8 8 7H-8Z"/><path stroke="#000" stroke-width="1.6" d="M0-3v5M0 4.5v.5"/></g>`,
 };
+// schlichter Stift (Strich wie die übrigen Symbole) statt des Emoji ✎ (Fabian 11.11.2026)
+const EDIT = `<svg class="edit" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>`;
 const icon = (fn, on, w = 26, h = 22) => `<svg width="${w}" height="${h}" viewBox="${-w / 2} ${-h / 2} ${w} ${h}">${fn(0, 0, on)}</svg>`;
 const elbow = (x1, y1, xm, x2, y2) => {
   if (Math.abs(y2 - y1) < 1) return `M${x1} ${y1}H${x2}`;
@@ -225,7 +227,7 @@ class HeatingCorePanel extends HTMLElement {
     const text = hint === "lead" ? `Vorheizen für ${next} · Kessel schonen`
       : hint === "skip" ? `Kurze Absenkung bis ${next} übersprungen · Kessel schonen`
       : `Zeitplan ${st?.state === "on" ? "Komfort" : "Absenkung"}${next ? ` bis ${next}` : ""}`;
-    return `<button class="plan ${st?.state === "on" || hint ? "on" : ""}" ${attrs} title="Zeitplan bearbeiten">${text} ✎</button>`;
+    return `<button class="plan ${st?.state === "on" || hint ? "on" : ""}" ${attrs} title="Zeitplan bearbeiten">${text}${EDIT}</button>`;
   }
 
   _openPlan(b) {
@@ -785,6 +787,7 @@ const CSS = `
   /* Bedienleiste je Heizkreis: Zeitplan | Absenkung | Ausschalten als gleich hohe Felder (Fabian 11.11.2026) */
   .gctl { display:inline-flex; flex-wrap:wrap; align-items:stretch; gap: 4px; padding: 4px; margin: 0 0 12px; background: var(--secondary-background-color); border-radius: 14px; max-width: 100%; box-sizing: border-box; }
   .gctl > * { margin: 0; min-height: 38px; box-sizing: border-box; display:flex; align-items:center; gap: 8px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--card-background-color); color: var(--primary-text-color); font-size: 13px; }
+  .plan .edit { opacity: .55; flex: none; margin-left: 2px; vertical-align: -2px; }
   .gctl > * { flex: 1 1 auto; } .gctl .mini { justify-content: space-between; }
   .gctl .plan, .gctl .plan.on, .gctl .chip { border-radius: 10px; padding: 0 12px; font-size: 13px; background: var(--card-background-color); }
   .gctl .plan::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: ${IDLE}; flex: none; }
