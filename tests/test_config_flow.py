@@ -55,7 +55,8 @@ async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == "form"
     defaults = {k.schema: k.default() for k in result["data_schema"].schema if callable(getattr(k, "default", None))}
-    assert "weather_enabled" not in defaults and "weather_zone1" not in defaults  # Ökofen: Heizkurve kompensiert selbst
+    assert "weather_enabled" not in defaults and "weather_zone1" not in defaults
+    assert "outdoor_sensor" not in {str(k) for k in result["data_schema"].schema}  # Ökofen: Heizkurve kompensiert selbst
     # nur Festes im Formular: Regler-Werte und das Vaillant-Budget nicht (Fabian, 11.11.2026)
     keys = {str(k) for k in result["data_schema"].schema}
     assert not keys & {"eco_temp", "away_temp", "hysteresis", "budget_per_hour", "presence_activation_min",
