@@ -150,9 +150,6 @@ class HeatingOptionsFlow(OptionsFlow):
                 vol.Required(OPT_MIN_TRV, default=o[OPT_MIN_TRV]): _temp(5, 15),
                 vol.Optional(OPT_AWAY_ENTITIES, default=o[OPT_AWAY_ENTITIES]): _entity(["input_boolean", "binary_sensor", "switch"], multiple=True),
                 _opt(OPT_GUEST_ENTITY, o): _entity(["input_boolean", "binary_sensor", "switch"]),
-                _opt(OPT_SUMMER_ENTITY, o): _entity(["input_boolean", "binary_sensor"]),
-                _opt(OPT_SUMMER_MEAN_SENSOR, o): _entity("sensor"),
-                vol.Required(OPT_SUMMER_LIMIT, default=o[OPT_SUMMER_LIMIT]): _temp(10, 22),
                 vol.Required(OPT_BOOST_ENABLED, default=o[OPT_BOOST_ENABLED]): bool,
                 vol.Required(OPT_BOOST_AMOUNT, default=o[OPT_BOOST_AMOUNT]): _temp(0.5, 3),
                 vol.Required(OPT_BOOST_THRESHOLD, default=o[OPT_BOOST_THRESHOLD]): _temp(0.5, 3),
@@ -177,6 +174,10 @@ class HeatingOptionsFlow(OptionsFlow):
             # Gebäude-Kompensation nur ohne eigene Heizkurve; bei Ökofen kompensiert die Pellematic selbst (HEATING-21)
             schema = schema.extend({
                 vol.Required(OPT_BUDGET, default=o[OPT_BUDGET]): _num(5, 20),  # Cloud-Limit, nur Vaillant
+                # Sommer: Ökofen schaltet über die Heizgrenze der Pellematic selbst ab – dort kein zweites System (Fabian, 11.11.2026)
+                _opt(OPT_SUMMER_ENTITY, o): _entity(["input_boolean", "binary_sensor"]),
+                _opt(OPT_SUMMER_MEAN_SENSOR, o): _entity("sensor"),
+                vol.Required(OPT_SUMMER_LIMIT, default=o[OPT_SUMMER_LIMIT]): _temp(10, 22),
                 _opt(OPT_OUTDOOR_SENSOR, o): _entity("sensor", device_class="temperature"),  # nur für die Gebäude-Kompensation
                 vol.Required(OPT_WEATHER_ENABLED, default=o[OPT_WEATHER_ENABLED]): bool,
                 vol.Required(OPT_WEATHER_ZONE1, default=o[OPT_WEATHER_ZONE1]): _temp(0, 5),

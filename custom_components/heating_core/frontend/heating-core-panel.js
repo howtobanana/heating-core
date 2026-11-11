@@ -29,10 +29,11 @@ const HEATING = new Set(["presence", "schedule", "pre_heat", "manual", "boost", 
 const OFF_MODES = new Set(["circuit_off", "summer", "away", "window", "unavailable", "disabled"]);
 const HOT = "#f4511e", COLD = "#1e88e5", IDLE = "#9aa5b1", WARN = "#f5a623";
 
-const val = (v, unit) => { // Regler-Anzeige
+const val = (v, unit) => { // Anzeige der Grundwerte
   const n = Number(v);
   if (unit === "s") return n >= 60 && n % 60 === 0 ? `${n / 60} min` : `${Math.round(n)} s`;
-  return unit === "min" ? `${Math.round(n)} min` : `${fmt(v)} °C`;
+  if (unit === "min") return n >= 120 && n % 60 === 0 ? `${n / 60} h` : `${Math.round(n)} min`;
+  return `${fmt(v)} °C`;
 };
 const has = (v) => v !== null && v !== undefined && v !== "" && !isNaN(Number(v));
 const fmt = (v, d = 1) => (has(v) ? Number(v).toLocaleString("de-AT", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
@@ -137,10 +138,10 @@ class HeatingCorePanel extends HTMLElement {
     this._hass.callService("number", "set_value", { entity_id: id, value: Number(value) });
   }
 
-  _step(id, dir) {
+  _step(id, dir, by) {
     const st = this._st(id);
     if (!st) return;
-    const a = st.attributes, step = Number(a.step) || 0.5;
+    const a = st.attributes, step = Number(by) || Number(a.step) || 0.5;
     const v = Math.min(Number(a.max), Math.max(Number(a.min), Math.round((Number(st.state) + dir * step) / step) * step));
     if (v !== Number(st.state)) this._setNumber(id, v);
   }
@@ -158,13 +159,14 @@ class HeatingCorePanel extends HTMLElement {
     return `<span class="badge ${this._tone(mode, problem)}">${esc(problem ? PROBLEMS[problem] || problem : MODES[mode] || mode || "–")}</span>`;
   }
 
-  _slider(id, label) {
+  // Grundwert: Name + Erklärung links, −/Wert/+ rechts; by = Schrittweite, wenn die des Reglers zu fein ist
+  _setting(id, label, hint, by) {
     const st = this._st(id);
     if (!st) return "";
-    const a = st.attributes, unit = ["min", "s"].includes(a.unit_of_measurement) ? a.unit_of_measurement : "°C";
-    return `<label class="slider"><span>${esc(label)}</span>
-      <input type="range" data-number="${id}" data-unit="${unit}" min="${a.min}" max="${a.max}" step="${a.step}" value="${st.state}">
-      <b data-out="${id}">${val(st.state, unit)}</b></label>`;
+    const u = st.attributes.unit_of_measurement;
+    return `<div class="set"><div><span>${esc(label)}</span><small>${esc(hint)}</small></div>
+      <div class="mini"><button data-step="${id}" data-d="-1" ${by ? `data-by="${by}"` : ""} aria-label="${esc(label)} weniger">−</button>
+      <b>${val(st.state, u)}</b><button data-step="${id}" data-d="1" ${by ? `data-by="${by}"` : ""} aria-label="${esc(label)} mehr">+</button></div></div>`;
   }
 
   // Drehregler wie die HA-Thermostat-Karte: Bogen = Ist, Knopf = Komfort (ziehbar), Mitte = Komfort groß.
@@ -403,10 +405,15 @@ class HeatingCorePanel extends HTMLElement {
       ${problems.length ? `<div class="alert">${icon(I.warn, false, 20, 20)}<span>${problems.map((p) => esc(p.replace(/: (\w+)$/, (m, k) => " – " + (PROBLEMS[k] || k)))).join("<br>")}</span></div>` : ""}
       <section class="card"><div class="cardhead"><h2>Anlage</h2></div>${this._schema(info, this._narrow, this._st(s.fuel), sys.model)}${this._kessel(this._a(s.fuel).kessel)}${this._legend()}</section>
       ${info.map((i) => this._circuitGroup(i)).join("")}
-      <section class="card"><h2>Grundwerte</h2>${this._slider(s.away_temp, "Abwesend")}
-        ${this._slider(s.presence_on_min, "Präsenz an nach")}${this._slider(s.presence_off_min, "Präsenz aus nach")}
-        ${this._slider(s.hysteresis, "Hysterese")}${this._slider(s.window_delay_s, "Fenster offen ab")}
-        ${this._slider(s.window_settle_s, "Nach Fenster zu warten")}${this._slider(s.pre_heat_timeout_min, "Vorheizen höchstens")}</section>
+      <section class="card"><h2>Grundwerte</h2><div class="sets">
+        <div class="grp"><h3>Abwesend</h3>${this._setting(s.away_temp, "Temperatur", "im ganzen Haus, solange Abwesend an ist")}</div>
+        <div class="grp"><h3>Präsenz</h3>${this._setting(s.presence_on_min, "Gilt nach", "so lange da, bevor Komfort beginnt")}
+          ${this._setting(s.presence_off_min, "Hält noch", "Komfort nach dem Gehen", 5)}</div>
+        <div class="grp"><h3>Fenster</h3>${this._setting(s.window_delay_s, "Absenken nach", "so lange offen, bevor abgesenkt wird")}
+          ${this._setting(s.window_settle_s, "Danach warten", "nach dem Schließen, Fühler misst zu kalt")}</div>
+        <div class="grp"><h3>Regelung</h3>${this._setting(s.hysteresis, "Hysterese", "Abstand zum Ziel, bevor nachgeregelt wird")}
+          ${this._setting(s.pre_heat_timeout_min, "Vorheizen höchstens", "schaltet sich danach selbst aus")}</div>
+      </div></section>
     </div>`;
   }
 
@@ -457,14 +464,8 @@ class HeatingCorePanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-select]").forEach((b) => b.addEventListener("click", () =>
       this._hass.callService("select", "select_option", { entity_id: b.dataset.select, option: b.dataset.option })));
     this.shadowRoot.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", () => this._openPlan(b)));
-    this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d))));
+    this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._step(b.dataset.step, Number(b.dataset.d), b.dataset.by)));
     this.shadowRoot.querySelectorAll("[data-dial]").forEach((svg) => this._wireDial(svg));
-    this.shadowRoot.querySelectorAll("[data-number]").forEach((inp) => {
-      const out = this.shadowRoot.querySelector(`[data-out="${inp.dataset.number}"]`);
-      inp.addEventListener("pointerdown", () => { this._dragging = true; });
-      inp.addEventListener("input", () => { out.textContent = val(inp.value, inp.dataset.unit); });
-      inp.addEventListener("change", () => { this._dragging = false; this._setNumber(inp.dataset.number, inp.value); });
-    });
   }
 }
 
@@ -790,9 +791,13 @@ const CSS = `
   .chip { border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin-top: 4px; }
   .chip.offchip { background: ${COLD}22; border-color: ${COLD}; color: var(--primary-text-color); }
   .chip.on { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
-  .slider { display:grid; grid-template-columns: 90px 1fr 70px; align-items:center; gap:8px; font-size: 14px; margin: 8px 0; }
-  .slider input { width: 100%; accent-color: var(--primary-color); }
-  .slider b { text-align: right; }
+  .sets { display:grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 12px; }
+  .grp { background: var(--secondary-background-color); border-radius: 12px; padding: 10px 14px; }
+  .grp h3 { margin: 2px 0 4px; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--secondary-text-color); }
+  .set { display:flex; align-items:center; justify-content:space-between; gap: 10px; padding: 8px 0; }
+  .set + .set { border-top: 1px solid var(--divider-color); }
+  .set span { display:block; font-size: 14px; } .set small { display:block; font-size: 12px; color: var(--secondary-text-color); }
+  .set .mini { margin-top: 0; flex: none; } .set .mini b { min-width: 58px; text-align: center; font-size: 15px; }
   @media (max-width: 600px) { .tiles { grid-template-columns: repeat(2, 1fr); gap: 10px; } .ring { width: 104px; height: 104px; } .seg button { padding: 8px 11px; } }
   button:not(:disabled), [role="button"], summary, label:has(input:not(:disabled)), input[type="range"]:not(:disabled) { cursor: pointer; }
   :disabled { cursor: not-allowed; }
