@@ -54,6 +54,7 @@ async def test_optionen_boost_aus(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == "form"
+    assert "Pellematic" in result["description_placeholders"]["hint"]  # Tipp je Hersteller
     defaults = {k.schema: k.default() for k in result["data_schema"].schema if callable(getattr(k, "default", None))}
     assert "weather_enabled" not in defaults and "weather_zone1" not in defaults
     assert not {"outdoor_sensor", "summer_entity", "summer_mean_sensor", "summer_limit"} & {str(k) for k in result["data_schema"].schema}  # Ökofen: Heizkurve kompensiert selbst

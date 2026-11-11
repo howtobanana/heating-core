@@ -10,7 +10,7 @@
         "description": "Eine Anlage pro Home Assistant: ein Haus mit einem Wärmeerzeuger. Heizkreise und Räume legst du danach als Unter-Einträge an.",
         "data_description": {
           "name": "Wie die Anlage heißt, z. B. „Wien“. Erscheint auf der Seite „Heizung“ und vor den Entitäten.",
-          "manufacturer": "Bestimmt, wie Heating Core mit dem Wärmeerzeuger spricht. Vaillant: Sollwert an die Zone (Cloud, mit Schreib-Budget). Ökofen: Betriebsart heizen/absenken plus Offset, die Heizkurve der Pellematic bleibt aktiv. Andere: beliebiges climate-Thermostat."
+          "manufacturer": "Bestimmt, wie Heating Core mit dem Wärmeerzeuger spricht. Vaillant: Sollwert an die Zone über die myVaillant-Integration (Cloud, Schreib-Budget). Ökofen: Betriebsart heizen/absenken plus Offset über die Integration „Ökofen Pellematic Compact“, die Heizkurve der Pellematic bleibt aktiv. Die Hersteller-Integration muss vorher eingerichtet sein."
         }
       }
     },
@@ -23,15 +23,8 @@
       "init": {
         "title": "Einstellungen der Anlage",
         "data": {
-          "eco_temp": "Eco-Temperatur",
-          "away_temp": "Abwesend-Temperatur",
           "min_trv_temp": "TRV-Minimum (Frostschutz, Fenster offen)",
-          "hysteresis": "Hysterese",
           "budget_per_hour": "Schreib-Budget pro Stunde",
-          "presence_activation_min": "Präsenz gilt nach (min)",
-          "presence_deactivation_min": "Präsenz-Nachlauf (min)",
-          "window_delay_s": "Fenster offen ab (s)",
-          "window_settle_s": "Nach Schließen warten (s)",
           "away_entities": "Abwesend-Schalter (z. B. Geofencing)",
           "guest_entity": "Gast-Schalter",
           "summer_entity": "Sommer-Schalter",
@@ -45,7 +38,6 @@
           "boost_threshold": "Boost ab Abstand",
           "humidity_enabled": "Feuchte-Kompensation",
           "humidity_drop": "Absenkung je 10 % über 60 %",
-          "pre_heat_timeout_min": "Vorheizen höchstens (min)",
           "push_enabled": "Push aufs Handy",
           "notify_devices": "Handys (Mobile App)",
           "quiet_schedule": "Ruhezeit (Zeitplan, dann keine Pushes)",
@@ -61,37 +53,29 @@
           "briefing_time": "Tägliches Briefing um",
           "error_entity": "Störcode der Therme"
         },
-        "description": "Gilt für die ganze Anlage. Komfort und Absenkung stellst du je Heizkreis bzw. Raum am Regler oder auf der Seite „Heizung“ ein.",
+        "description": "Gilt für die ganze Anlage. Komfort und Absenkung stellst du je Heizkreis bzw. Raum auf der Seite „Heizung“ ein.\n\n{hint}",
         "data_description": {
-          "eco_temp": "Vorgabe für die Absenkung neuer Heizkreise. Jeder Heizkreis hat danach seinen eigenen Regler „Absenkung“.",
-          "away_temp": "Gilt im ganzen Haus, solange „Abwesend“ aktiv ist (Schalter, Geofencing). Vorheizen hebt sie auf.",
           "min_trv_temp": "Untergrenze für alle Thermostate: Frostschutz, Fenster offen, Sommer. Darunter schreibt Heating Core nie.",
-          "hysteresis": "So viel muss die Ist-Temperatur vom Ziel abweichen, bevor nachgeregelt wird. Verhindert ständiges Hin- und Herschalten. Üblich: 0,5–0,8 °C.",
-          "budget_per_hour": "Nur Vaillant: so oft darf Heating Core pro Stunde an die Therme schreiben (Cloud-Limit). Sicherheits-Schreibvorgänge (Fenster, NOT-AUS) zählen nicht. Ökofen hat kein Budget.",
-          "presence_activation_min": "So lange muss Präsenz ununterbrochen erkannt werden, bevor auf Komfort geheizt wird. Filtert kurzes Durchgehen.",
-          "presence_deactivation_min": "So lange wird nach der letzten Präsenz noch auf Komfort geheizt.",
-          "window_delay_s": "Erst wenn das Fenster so lange offen ist, senkt Heating Core ab. Kurzes Öffnen bleibt ohne Folgen.",
-          "window_settle_s": "Nach dem Schließen so lange warten, bevor wieder geheizt wird – der Fühler misst direkt danach zu kalt.",
-          "pre_heat_timeout_min": "Vorheizen schaltet sich spätestens nach dieser Zeit selbst aus, auch wenn niemand kommt.",
+          "budget_per_hour": "So oft darf Heating Core pro Stunde an die Therme schreiben (Cloud-Limit). Sicherheit (Fenster, NOT-AUS) zählt nicht. Üblich: 10–13.",
           "away_entities": "Ist einer dieser Schalter an, gilt „Abwesend“ (z. B. input_boolean.global_away vom Geofencing). Zusätzlich gibt es den Schalter „Abwesend“ der Anlage.",
           "guest_entity": "Gäste im Haus: „Abwesend“ wird ignoriert, solange dieser Schalter an ist.",
-          "summer_entity": "Ist er an, ruht die Heizung: Thermostate auf Minimum, Vaillant-Therme aus (Warmwasser läuft weiter), danach automatisch wieder an.",
+          "summer_entity": "Ist er an, ruht die Heizung: Thermostate auf Minimum, Therme aus (Warmwasser läuft weiter), danach automatisch wieder an.",
           "outdoor_sensor": "Außentemperatur für die Gebäude-Kompensation. Leer lassen, wenn du sie nicht nutzt.",
           "weather_enabled": "Hebt den Sollwert bei Kälte etwas an, weil Wände und Fenster dann auskühlen. Nicht bei Abwesenheit.",
           "weather_zone1": "Aufschlag in °C, wenn es draußen −10 °C oder kälter hat.",
           "weather_zone2": "Aufschlag in °C bei −10 bis 0 °C.",
           "weather_zone3": "Aufschlag in °C bei 0 bis +10 °C. Darüber kein Aufschlag.",
-          "boost_enabled": "Schneller aufheizen: Liegt ein Raum deutlich unter Komfort, wird kurz höher angefordert. Bei Ökofen (Heizkurve) besser aus.",
+          "boost_enabled": "Schneller aufheizen: Liegt ein Raum deutlich unter Komfort, wird kurz höher angefordert. Bei Ökofen besser aus – die Heizkurve regelt den Vorlauf selbst, Boost kostet Brennerstarts.",
           "boost_amount": "So viel °C wird während des Boosts zusätzlich angefordert.",
           "boost_threshold": "Ab dieser Abweichung unter Komfort startet der Boost. Er endet, sobald der Raum fast Komfort erreicht hat.",
-          "humidity_enabled": "Senkt den Sollwert leicht, wenn die Luftfeuchte hoch ist – feuchte Luft fühlt sich wärmer an.",
+          "humidity_enabled": "Senkt den Sollwert leicht, wenn die Luftfeuchte hoch ist – feuchte Luft fühlt sich wärmer an. Braucht einen Feuchtesensor am Heizkreis.",
           "humidity_drop": "Absenkung in °C je 10 % Luftfeuchte über 60 %, höchstens 2 °C.",
           "push_enabled": "Schickt Schreibvorgänge und neue Probleme aufs Handy. Die Problem-Meldung in HA gibt es immer.",
           "notify_devices": "Handys mit der Home-Assistant-App, die Push-Nachrichten bekommen.",
           "quiet_schedule": "Solange dieser Zeitplan an ist (z. B. nachts), werden keine Push-Nachrichten verschickt.",
           "leitstand_expert": "Zeigt nach jedem Lauf alle Details (Soll, Ist, Entscheidung, Budget je Kreis und Raum) als HA-Meldung. Zur Fehlersuche, sonst aus.",
-          "room_demand_delta": "Nur Ökofen: Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt. Sonst heizt er nur über sein Thermostat, und der Kessel läuft ruhig weiter. 0 = jeder Raum darf sofort anheben.",
-          "pre_heat_lead": "Nur Ökofen: So viele Stunden vor dem Zeitplan beginnt Komfort, weil der Kessel träge ist. Die Seite „Heizung“ zeigt dann „Vorheizen für …“. 0 = Zeitplan gilt genau.",
+          "room_demand_delta": "Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt – sonst heizt er nur über sein Thermostat, und der träge Kessel läuft ruhig weiter. 0 = jeder Raum sofort.",
+          "pre_heat_lead": "So viele Stunden vor dem Zeitplan beginnt Komfort, weil der Kessel träge ist. Die Seite „Heizung“ zeigt dann „Vorheizen für …“. 0 = Zeitplan gilt genau.",
           "summer_mean_sensor": "Statistik-Helfer mit dem gleitenden 72-h-Mittel der Außentemperatur. Ist er gesetzt und der Sommer-Schalter ein input_boolean, schaltet Heating Core den Sommer selbst – nur wenn Schreiben an ist. Leer = Sommer nur von Hand.",
           "summer_limit": "Sommer ab Heizgrenze + 1,5 °C im 72-h-Mittel, Heizsaison wieder unter Heizgrenze − 1,5 °C.",
           "battery_min": "Meldet schwache Batterien aller Geräte, die Heating Core benutzt (Thermostate, Fühler, Fensterkontakte) – automatisch über ihre Geräte, ohne Eintragen.",
@@ -152,20 +136,20 @@
             "hvac_mode": "Betriebsart nach dem Sommer",
             "pre_heat_entity": "Vorheizen-Helfer (optional)"
           },
-          "description": "Geräte und Bedarfsquellen des Heizkreises. Komfort und Absenkung stellst du danach am Regler ein.",
+          "description": "Geräte und Bedarfsquellen des Heizkreises. Komfort und Absenkung stellst du danach auf der Seite „Heizung“ ein.\n\n{hint}",
           "data_description": {
-            "master_climate": "Die Zone bzw. der Heizkreis am Wärmeerzeuger, an die Heating Core den Sollwert schreibt (z. B. Vaillant-Zone, Pellematic-Heizkreis). Ökofen: an der Pellematic für diesen Heizkreis Raumfühler aus bzw. Raumeinfluss 0 und Ökomodus aus – sonst schaltet sie den Kreis selbst ab (Anleitung im README).",
-            "presence_sensors": "Präsenzmelder im führenden Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
-            "schedule": "Zeitplan-Helfer: an = Komfort, aus = Absenkung. Räume ohne eigenen Plan übernehmen diesen. Ohne Zeitplan und ohne Präsenz heizt der Kreis immer auf Komfort.",
-            "window": "Fensterkontakt im führenden Raum. Offen länger als die Fenster-Verzögerung → Minimum.",
-            "temp_sensor": "Raumfühler für den führenden Raum. Genauer als der Fühler am Wärmeerzeuger; ohne ihn wird dessen Ist-Wert genommen.",
-            "humidity_sensor": "Luftfeuchte für die Feuchte-Kompensation.",
+            "master_climate": "Zone bzw. Heizkreis am Wärmeerzeuger, an den Heating Core schreibt.",
+            "presence_sensors": "Präsenzmelder im Hauptraum des Kreises. Präsenz → Komfort, auch außerhalb des Zeitplans. Glätten: Seite „Heizung“ → Grundwerte → Präsenz.",
+            "schedule": "Zeitplan-Helfer: an = Komfort, aus = Absenkung. Räume ohne eigenen Plan übernehmen ihn. Ohne Zeitplan und Präsenz gilt die Absenkung. Bearbeiten geht am einfachsten auf der Seite „Heizung“.",
+            "window": "Fensterkontakt im Hauptraum. Länger offen als „Fenster offen ab“ → ganzer Kreis auf Minimum.",
+            "temp_sensor": "Raumfühler im Hauptraum. Genauer als der Fühler am Wärmeerzeuger; ohne ihn gilt dessen Ist-Wert.",
+            "humidity_sensor": "Luftfeuchte im Hauptraum. Wirkt nur mit Feuchte-Kompensation (Einstellungen der Anlage).",
             "pump_switch": "Schalter der Pumpe dieses Fußbodenkreises. Läuft erst, wenn die Ventile offen sind und der Kessel warm genug ist.",
             "source_temp_sensor": "Kessel- bzw. Puffertemperatur, die den Fußbodenkreis freigibt.",
             "source_on": "Ab dieser Kesseltemperatur darf die Fußbodenpumpe laufen.",
             "source_off": "Unter dieser Kesseltemperatur wird die Pumpe gesperrt. Muss unter der Freigabe liegen.",
             "valve_delay_s": "So lange nach dem Öffnen der Ventile warten, bevor die Pumpe startet (Stellantriebe brauchen Zeit).",
-            "hvac_mode": "Nur Vaillant: Betriebsart der Zone, die nach dem Sommer wieder gesetzt wird. Handbetrieb: Sollwert direkt. Zeitprogramm: Heating Core setzt ein Quick-Veto und erneuert es.",
+            "hvac_mode": "Betriebsart der Zone nach dem Sommer. Handbetrieb: Sollwert direkt. Zeitprogramm (empfohlen): Heating Core setzt ein Quick-Veto und erneuert es – fällt HA aus, übernimmt wieder das Zeitprogramm der Therme.",
             "pre_heat_entity": "Optional, z. B. für das Geofencing: Ist dieser Schalter an, heizt Heating Core vor wie mit dem Knopf „Vorheizen“, und schaltet ihn nach dem Zeitlimit oder sobald Präsenz/Zeitplan übernimmt wieder aus. Leer = nur der eigene Knopf."
           }
         }
@@ -190,11 +174,11 @@
             "circuit": "Heizkreis",
             "role": "Rolle"
           },
-          "description": "Ein Raum hängt an einem Heizkreis und hat einen eigenen Thermostat (TRV), Ventil-Kanäle einer Fußbodenheizung oder nur Heizkörper ohne Thermostat.",
+          "description": "Ein Raum hängt an einem Heizkreis. Was im Raum hängt, bestimmt die Rolle; die passenden Felder kommen im nächsten Schritt.",
           "data_description": {
-            "name": "Wie der Raum heißt, z. B. „Büro OG“.",
+            "name": "Wie der Raum heißt, z. B. „Büro“. Gleiche Namen in verschiedenen Kreisen sind erlaubt.",
             "circuit": "Der Heizkreis, an dem der Heizkörper bzw. die Fußbodenzone hängt.",
-            "role": "Eigener Raum: TRV mit eigener Regelung, hebt bei Bedarf den Heizkreis an. Folgt dem Master: TRV übernimmt den Sollwert des Heizkreises plus Abstand. Fußboden-Zone: Ventil-Kanäle eines Fußbodenkreises. Heizkörper ohne Thermostat: hängt nur am Heizkreis, wird mit ihm warm und erscheint im Anlagenschema – regelt nichts."
+            "role": "Eigener Raum: Thermostat mit eigener Regelung. Folgt dem Heizkreis: Thermostat übernimmt dessen Sollwert. Fußboden-Zone: Ventil-Kanäle. Heizkörper ohne Thermostat: nur Anzeige im Schema."
           }
         },
         "reconfigure": {
@@ -204,11 +188,11 @@
             "circuit": "Heizkreis",
             "role": "Rolle"
           },
-          "description": "Ein Raum hängt an einem Heizkreis und hat entweder einen eigenen Thermostat (TRV) oder Ventil-Kanäle einer Fußbodenheizung.",
+          "description": "Ein Raum hängt an einem Heizkreis. Was im Raum hängt, bestimmt die Rolle; die passenden Felder kommen im nächsten Schritt.",
           "data_description": {
-            "name": "Wie der Raum heißt, z. B. „Büro OG“.",
+            "name": "Wie der Raum heißt, z. B. „Büro“. Gleiche Namen in verschiedenen Kreisen sind erlaubt.",
             "circuit": "Der Heizkreis, an dem der Heizkörper bzw. die Fußbodenzone hängt.",
-            "role": "Eigener Raum: TRV mit eigener Regelung, hebt bei Bedarf den Heizkreis an. Folgt dem Master: TRV übernimmt den Sollwert des Heizkreises plus Abstand. Fußboden-Zone: Ventil-Kanäle eines Fußbodenkreises."
+            "role": "Eigener Raum: Thermostat mit eigener Regelung. Folgt dem Heizkreis: Thermostat übernimmt dessen Sollwert. Fußboden-Zone: Ventil-Kanäle. Heizkörper ohne Thermostat: nur Anzeige im Schema."
           }
         },
         "details": {
@@ -216,21 +200,21 @@
           "data": {
             "climate": "Heizkörper-Thermostat (TRV)",
             "valves": "Ventil-Kanäle (schalten gemeinsam)",
-            "offset": "Abstand zum Master",
+            "offset": "Abstand zum Heizkreis",
             "presence_sensors": "Präsenzsensoren",
             "schedule": "Eigener Zeitplan (sonst der des Heizkreises)",
             "window": "Fensterkontakt",
             "temp_sensor": "Temperatursensor"
           },
-          "description": "Geräte des Raums. Komfort stellst du danach am Regler, im Dashboard oder auf der Seite „Heizung“ ein; die Absenkung kommt vom Heizkreis.",
+          "description": "Geräte des Raums. Komfort stellst du danach auf der Seite „Heizung“ ein; die Absenkung kommt vom Heizkreis.\n\n{hint}",
           "data_description": {
             "climate": "Das Heizkörper-Thermostat (TRV), an das Heating Core den Sollwert schreibt.",
             "valves": "Ventil-Kanäle dieser Zone; sie schalten immer gemeinsam.",
             "offset": "Abstand zum Sollwert des Heizkreises, z. B. −2 °C für ein kühleres Schlafzimmer.",
             "presence_sensors": "Präsenzmelder im Raum. Präsenz → Komfort, auch außerhalb des Zeitplans.",
             "schedule": "Eigener Zeitplan nur für diesen Raum. Leer lassen = Zeitplan des Heizkreises.",
-            "window": "Fensterkontakt im Raum. Offen länger als die Fenster-Verzögerung → Minimum.",
-            "temp_sensor": "Eigener Raumfühler. Genauer als der Fühler im Thermostat am Heizkörper."
+            "window": "Fensterkontakt im Raum. Länger offen als „Fenster offen ab“ → Thermostat auf Minimum.",
+            "temp_sensor": "Eigener Raumfühler – genauer als der im Thermostat. Heating Core gleicht das Thermostat damit ab."
           }
         }
       },
@@ -258,7 +242,7 @@
     "role": {
       "options": {
         "isolated": "Eigener Raum (eigene Regelung)",
-        "follower": "Folgt dem Master",
+        "follower": "Folgt dem Heizkreis",
         "floor_zone": "Fußboden-Zone (Ventil-Kanäle)",
         "passive": "Heizkörper ohne Thermostat (nur Anzeige)"
       }
@@ -295,7 +279,7 @@
       "mode": {
         "name": "Modus",
         "state": {
-          "eco": "Eco",
+          "eco": "Absenkung",
           "presence": "Präsenz",
           "schedule": "Zeitplan",
           "pre_heat": "Vorheizen",
@@ -336,7 +320,7 @@
         "name": "Komfort"
       },
       "eco": {
-        "name": "Eco"
+        "name": "Absenkung (Vorgabe)"
       },
       "away_temp": {
         "name": "Abwesend-Temperatur"

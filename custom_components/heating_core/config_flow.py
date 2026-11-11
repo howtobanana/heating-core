@@ -99,6 +99,37 @@ def _opt(key: str, data: dict) -> Any:
     return vol.Optional(key, description={"suggested_value": data.get(key)})
 
 
+# Tipps je Hersteller bzw. Rolle für den Platzhalter {hint}; Sprache = Sprache der HA-Instanz
+HINTS_BY_LANG: dict[str, dict[str, str]] = {
+    "de": {
+        "options_oekofen": "Sommer, Außentemperatur, Gebäude-Kompensation und Schreib-Budget fehlen hier absichtlich – das regelt die Pellematic über Heizkurve und Heizgrenze. Häufig verstellte Werte (Abwesend, Präsenz, Fenster, Hysterese, Vorheizen) stehen auf der Seite „Heizung“ unter Grundwerte.",
+        "options_vaillant": "Heating Core schreibt über die myVaillant-Cloud: Änderungen kommen verzögert an und sind je Stunde begrenzt (Schreib-Budget). Häufig verstellte Werte (Abwesend, Präsenz, Fenster, Hysterese, Vorheizen) stehen auf der Seite „Heizung“ unter Grundwerte.",
+        "oekofen": "Ökofen: Master ist der Heizkreis der Pellematic. Heating Core schaltet ihn zwischen heizen und absenken, die Heizkurve bleibt aktiv. An der Pellematic für diesen Kreis Raumfühler aus (Raumeinfluss 0) und Ökomodus aus – sonst schaltet sie den Kreis selbst ab; das meldet Heating Core unter Einstellungen → Reparaturen.",
+        "vaillant": "Vaillant: Master ist die Zone der Therme (z. B. climate.…_zone_1_circuit_0_climate). Mit eigenem Raumfühler regelt Heating Core genauer als mit dem Fühler der Therme.",
+        "floor_external": "Fußboden extern: Heating Core schaltet Pumpe und Zonen-Ventile selbst; die Pumpe läuft nur, wenn der Kessel warm genug ist. Zeitplan und Präsenz gelten für alle Zonen ohne eigenen Plan.",
+        "role_isolated": "Das Thermostat bekommt Komfort bzw. Absenkung; braucht der Raum Wärme, hebt er den Heizkreis an. Am Thermostat Eco und Wochenprogramm aus, Modus manuell – sonst regeln zwei Systeme gegeneinander.",
+        "role_follower": "Das Thermostat übernimmt den Sollwert des Heizkreises plus Abstand und hat keinen eigenen Bedarf – gut für Nebenräume.",
+        "role_floor_zone": "Die Ventil-Kanäle öffnen, solange die Zone Wärme braucht. Ohne Temperaturfühler meldet die Zone „Sensor fehlt“.",
+        "role_passive": "Wird mit dem Heizkreis warm und erscheint nur im Anlagenschema. Der Fühler ist optional und dient nur der Anzeige."
+    },
+    "en": {
+        "options_oekofen": "Summer, outdoor temperature, building compensation and write budget are left out on purpose – the Pellematic handles them via its heating curve and heating limit. Values you change now and then (away, presence, window, hysteresis, pre-heat) are on the “Heizung” page under “Grundwerte”.",
+        "options_vaillant": "Heating Core writes via the myVaillant cloud: changes arrive with a delay and are limited per hour (write budget). Values you change now and then (away, presence, window, hysteresis, pre-heat) are on the “Heizung” page under “Grundwerte”.",
+        "oekofen": "Ökofen: the master is the Pellematic heating circuit. Heating Core switches it between heat and setback; the heating curve stays active. On the Pellematic, set this circuit's room sensor off (room influence 0) and eco mode off – otherwise it shuts the circuit down itself; Heating Core reports that under Settings → Repairs.",
+        "vaillant": "Vaillant: the master is the boiler zone (e.g. climate.…_zone_1_circuit_0_climate). With its own room sensor Heating Core controls more precisely than with the boiler's sensor.",
+        "floor_external": "External floor: Heating Core switches pump and zone valves itself; the pump only runs while the boiler is warm enough. Schedule and presence apply to all zones without their own schedule.",
+        "role_isolated": "The thermostat gets comfort or setback; when the room needs heat it raises the circuit. Turn eco and the weekly program off on the thermostat and set it to manual – otherwise two systems fight each other.",
+        "role_follower": "The thermostat takes the circuit's setpoint plus offset and has no demand of its own – good for side rooms.",
+        "role_floor_zone": "The valve channels open while the zone needs heat. Without a temperature sensor the zone reports “Sensor missing”.",
+        "role_passive": "Warms up with the circuit and only appears in the system diagram. The sensor is optional and only for display."
+    }
+}
+
+
+def _hints(hass) -> dict[str, str]:
+    return HINTS_BY_LANG["de" if str(hass.config.language).startswith("de") else "en"]
+
+
 class HeatingCoreConfigFlow(ConfigFlow, domain=DOMAIN):
     """Eine Anlage je HA-Instanz (Fabian, 09.11.2026; manifest single_config_entry); Heizkreise und Räume darunter beliebig."""
 
@@ -141,7 +172,8 @@ class HeatingOptionsFlow(OptionsFlow):
             # damit geleerte optionale Felder weg sind
             keep = {k: v for k, v in self.config_entry.options.items() if k not in {str(m) for m in schema.schema}}
             return self.async_create_entry(data={**keep, **user_input})
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="init", data_schema=schema, description_placeholders={
+            "hint": _hints(self.hass)["options_" + ("oekofen" if self.config_entry.data.get(CONF_MANUFACTURER) == "oekofen" else "vaillant")]})
 
     def _schema(self) -> vol.Schema:
         o = {**DEFAULTS, **self.config_entry.options}
@@ -228,6 +260,10 @@ class _BaseSubFlow(ConfigSubentryFlow):
     def _errors(self, data: dict) -> dict[str, str]:
         return {}
 
+    def _hint(self, d: dict) -> str:
+        """Tipp je Hersteller bzw. Rolle über dem zweiten Schritt (Platzhalter {hint} in den Übersetzungen)."""
+        return ""
+
     def _old(self) -> dict:
         return {**self._get_reconfigure_subentry().data, CONF_NAME: self._get_reconfigure_subentry().title} if self._reconf else {}
 
@@ -257,7 +293,8 @@ class _BaseSubFlow(ConfigSubentryFlow):
                     return self.async_update_and_abort(self._get_entry(), self._get_reconfigure_subentry(), title=title, data=data)
                 return self.async_create_entry(title=title, data=data)
         d = {**old, **self._base, **(user_input or {})}
-        return self.async_show_form(step_id="details", data_schema=self._detail_schema(d), errors=errors)
+        return self.async_show_form(step_id="details", data_schema=self._detail_schema(d), errors=errors,
+                                    description_placeholders={"hint": self._hint(d)})
 
 
 class CircuitFlow(_BaseSubFlow):
@@ -295,6 +332,11 @@ class CircuitFlow(_BaseSubFlow):
             )
         return vol.Schema(fields)
 
+    def _hint(self, d: dict) -> str:
+        if d.get(F_KIND) == KIND_FLOOR_EXTERNAL:
+            return _hints(self.hass)["floor_external"]
+        return _hints(self.hass).get(self._get_entry().data.get(CONF_MANUFACTURER), "")
+
     def _errors(self, data: dict) -> dict[str, str]:
         if data.get(F_KIND) == KIND_FLOOR_EXTERNAL and float(data[F_SOURCE_OFF]) >= float(data[F_SOURCE_ON]):
             return {"base": "source_hysteresis"}
@@ -331,6 +373,9 @@ class RoomFlow(_BaseSubFlow):
                 **_common(d, schedule=False, temp=False),
             })
         return vol.Schema({_req(F_CLIMATE, d): _entity("climate"), **_common(d)})
+
+    def _hint(self, d: dict) -> str:
+        return _hints(self.hass).get(f"role_{d.get(F_ROLE)}", "")
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         if not any(s.subentry_type == SUB_CIRCUIT for s in self._get_entry().subentries.values()):

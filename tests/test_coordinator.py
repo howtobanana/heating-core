@@ -134,7 +134,7 @@ async def test_komfort_regler_wirkt_sofort(hass: HomeAssistant, states) -> None:
 async def test_eco_regler(hass: HomeAssistant, states) -> None:
     hass.states.async_set(PRESENCE, "off")
     coordinator = await _setup(hass, _entry())
-    await hass.services.async_call("number", "set_value", {"entity_id": "number.test_eco", "value": 18.0}, blocking=True)
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.test_setback_default", "value": 18.0}, blocking=True)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert float(_sensor(hass, "kreis_setpoint").state) == 18.0
