@@ -276,9 +276,13 @@ async def test_traeger_kessel_kurze_absenkung(hass: HomeAssistant) -> None:
     _hk1_states(hass, mode="2_heizen")
     hass.states.async_set("climate.trv", "heat", {"temperature": 21, "current_temperature": 22.0})
     in_2h = (dt_util.now() + timedelta(hours=2)).isoformat()
-    hass.states.async_set("schedule.hk1", "off", {"next_event": in_2h})
+    hass.states.async_set("schedule.hk1", "off", {"next_event": in_2h})  # schon vor dem Start aus (wie nach HA-Neustart)
     coordinator = await _setup(hass, _hk1_entry(schedule="schedule.hk1"))
     coordinator.control.setback["hk1"] = 18.0
+    await coordinator.async_refresh()
+    assert coordinator.data["circuits"]["hk1"]["target"] == 18.0  # HEATING-39: Länge unbekannt -> Absenkung
+    hass.states.async_set("schedule.hk1", "on")
+    hass.states.async_set("schedule.hk1", "off", {"next_event": in_2h})  # Wechsel selbst gesehen
     await coordinator.async_refresh()
     assert coordinator.data["circuits"]["hk1"]["target"] == 22.0  # 2-h-Lücke: bleibt auf Komfort
     assert coordinator.data["circuits"]["hk1"]["plan_hint"] == "skip"  # Seite erklärt es (HEATING-30)
