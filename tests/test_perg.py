@@ -203,7 +203,7 @@ async def test_schreiben_uebernimmt_und_gibt_zurueck(hass: HomeAssistant) -> Non
     hass.states.async_set(f"select.{HK1_B}_mode_auto", "3_absenken")
     hass.states.async_set(f"number.{HK1_B}_remote_override", "-0.5")
     sel.clear(); num.clear()
-    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.p_writing_enabled"}, blocking=True)
+    await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.p_control_active"}, blocking=True)
     assert [c.data["option"] for c in sel] == ["1_auto"]
     assert [c.data["value"] for c in num] == [0]
 

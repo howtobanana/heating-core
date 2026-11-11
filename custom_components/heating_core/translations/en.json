@@ -76,7 +76,7 @@
           "leitstand_expert": "After every run, all details (target, actual, decision, budget per circuit and room) as an HA notification. For troubleshooting.",
           "room_demand_delta": "A room raises the whole circuit only when it is this far below its comfort – otherwise it heats via its own thermostat and the slow boiler keeps running calmly. 0 = every room at once.",
           "pre_heat_lead": "Comfort starts this many hours before the schedule because the boiler is slow. The “Heizung” page then shows “Pre-heating for …”. 0 = schedule applies exactly.",
-          "summer_mean_sensor": "Statistics helper with the rolling 72 h mean of the outdoor temperature. If set and the summer switch is an input_boolean, Heating Core switches summer itself – only while writing is on. Empty = summer only by hand.",
+          "summer_mean_sensor": "Statistics helper with the rolling 72 h mean of the outdoor temperature. If set and the summer switch is an input_boolean, Heating Core switches summer itself – only while “Steuern” (control) is on. Empty = summer only by hand.",
           "summer_limit": "Summer from heating limit + 1.5 °C (72 h mean), heating season again below heating limit − 1.5 °C.",
           "battery_min": "Reports weak batteries of every device Heating Core uses (thermostats, sensors, window contacts), found automatically via their devices.",
           "pressure_sensor": "System pressure in bar. Leave empty if the system does not report it.",
@@ -263,7 +263,7 @@
         "name": "Guest"
       },
       "write_enabled": {
-        "name": "Writing enabled"
+        "name": "Control active"
       },
       "pre_heat": {
         "name": "Pre-heat"

@@ -66,7 +66,7 @@ async def test_schattenbetrieb_rechnet_schreibt_nicht(hass: HomeAssistant, state
     calls = async_mock_service(hass, "climate", "set_temperature")
     await coordinator.async_refresh()
     assert calls == []
-    assert hass.states.get("switch.test_writing_enabled").state == "off"
+    assert hass.states.get("switch.test_control_active").state == "off"
 
 
 async def test_schreiben_aktiv_schreibt_master(hass: HomeAssistant, states) -> None:
@@ -75,7 +75,7 @@ async def test_schreiben_aktiv_schreibt_master(hass: HomeAssistant, states) -> N
     calls = async_mock_service(hass, "climate", "set_temperature")
     with patch("custom_components.heating_core.coordinator.STARTUP_GUARD_S", 0):
         coordinator._started = 0
-        await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.test_writing_enabled"}, blocking=True)
+        await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.test_control_active"}, blocking=True)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     targets = {c.data["entity_id"]: c.data["temperature"] for c in calls}

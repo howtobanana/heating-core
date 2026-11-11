@@ -76,7 +76,7 @@
           "leitstand_expert": "Zeigt nach jedem Lauf alle Details (Soll, Ist, Entscheidung, Budget je Kreis und Raum) als HA-Meldung. Zur Fehlersuche, sonst aus.",
           "room_demand_delta": "Ein Raum hebt den ganzen Heizkreis erst an, wenn er so weit unter seinem Komfort liegt – sonst heizt er nur über sein Thermostat, und der träge Kessel läuft ruhig weiter. 0 = jeder Raum sofort.",
           "pre_heat_lead": "So viele Stunden vor dem Zeitplan beginnt Komfort, weil der Kessel träge ist. Die Seite „Heizung“ zeigt dann „Vorheizen für …“. 0 = Zeitplan gilt genau.",
-          "summer_mean_sensor": "Statistik-Helfer mit dem gleitenden 72-h-Mittel der Außentemperatur. Ist er gesetzt und der Sommer-Schalter ein input_boolean, schaltet Heating Core den Sommer selbst – nur wenn Schreiben an ist. Leer = Sommer nur von Hand.",
+          "summer_mean_sensor": "Statistik-Helfer mit dem gleitenden 72-h-Mittel der Außentemperatur. Ist er gesetzt und der Sommer-Schalter ein input_boolean, schaltet Heating Core den Sommer selbst – nur wenn „Steuern“ an ist. Leer = Sommer nur von Hand.",
           "summer_limit": "Sommer ab Heizgrenze + 1,5 °C im 72-h-Mittel, Heizsaison wieder unter Heizgrenze − 1,5 °C.",
           "battery_min": "Meldet schwache Batterien aller Geräte, die Heating Core benutzt (Thermostate, Fühler, Fensterkontakte) – automatisch über ihre Geräte, ohne Eintragen.",
           "pressure_sensor": "Anlagendruck in bar. Leer lassen, wenn die Anlage keinen meldet.",
@@ -263,7 +263,7 @@
         "name": "Gast"
       },
       "write_enabled": {
-        "name": "Schreiben aktiv"
+        "name": "Steuern aktiv"
       },
       "pre_heat": {
         "name": "Vorheizen"

@@ -400,7 +400,7 @@ class HeatingCorePanel extends HTMLElement {
       <div class="status ${writing ? "live" : "shadow"}">
         <div class="stxt"><b>${writing ? "Steuert aktiv" : "Schattenbetrieb"}</b><small>${writing ? "Heating Core schaltet die Anlage." : "Rechnet mit, schaltet aber nichts."}</small></div>
         <div class="seg">
-          <button class="${writing ? "on" : ""}" data-toggle="${s.write_enabled}" aria-pressed="${writing}">Schreiben</button>
+          <button class="${writing ? "on" : ""}" data-toggle="${s.write_enabled}" aria-pressed="${writing}" title="An: Heating Core steuert die Anlage. Aus: rechnet nur mit (Schattenbetrieb).">Steuern</button>
           <button class="${this._on(s.away) ? "on" : ""}" data-toggle="${s.away}" aria-pressed="${this._on(s.away)}">Abwesend</button>
           <button class="${this._on(s.guest) ? "on" : ""}" data-toggle="${s.guest}" aria-pressed="${this._on(s.guest)}">Gast</button>
         </div>
@@ -716,7 +716,7 @@ const CSS = `
   :host { display:block; background: var(--primary-background-color); color: var(--primary-text-color); min-height:100vh; }
   .page { max-width: 1100px; margin: 0 auto; padding: 0 16px 32px; font-family: var(--paper-font-body1_-_font-family, system-ui); }
   .top { display:flex; align-items:center; gap:8px; height:56px; font-size:20px; font-weight: 500; }
-  h1 { font-size: 26px; font-weight: 600; margin: 4px 0 12px; } h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  h1 { font-size: 26px; font-weight: 600; margin: 4px 0 12px; } h2 { font-size: 16px; font-weight: 600; margin: 0; } .card > h2 { margin-bottom: 12px; }
   .system { margin-bottom: 32px; }
   .muted { color: var(--secondary-text-color); }
   .card { background: var(--card-background-color); border-radius: 16px; padding: 16px; border: 1px solid var(--divider-color); box-shadow: var(--ha-card-box-shadow, none); margin-bottom: 16px; }
